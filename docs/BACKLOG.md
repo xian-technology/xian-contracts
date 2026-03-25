@@ -3,7 +3,6 @@
 ## High Value Follow-Up
 
 - Add deeper automated tests for `dex`.
-- Add automated tests for `reflection-token`.
 - Add automated tests for `privacy-token`.
 - Add at least smoke coverage for `lottery` if it remains in the curated hub.
 - Review whether `dex` should be split into a cleaner `v2`-style package with

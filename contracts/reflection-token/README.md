@@ -17,8 +17,10 @@ Fee-on-transfer reflection token designed to work with the Xian DEX.
 - DEX integration requires setting the pair and router as fee targets before
   liquidity is added.
 - Excluding pool addresses from rewards is part of the normal setup.
+- Excluded balances are tracked explicitly so excluded pools do not distort the
+  reflection rate basis.
 
 ## Validation
 
 - repo-wide lint and compile checks
-- no package-local automated tests yet
+- package-local tests in `tests/test_reflection_token.py`

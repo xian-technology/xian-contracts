@@ -6,12 +6,55 @@ BURN_ADDRESS = "0" * 64
 
 balances = Hash(default_value=ZERO)  # Reflected balances for included addresses
 t_balances = Hash(default_value=ZERO)  # True balances for excluded addresses
+excluded_r_balances = Hash(default_value=ZERO)
 metadata = Hash()
 excluded = Hash(default_value=False)
-r_total = Variable(default_value=ZERO)  # Reflected total supply
-t_total = Variable(default_value=ZERO)  # True total supply
+r_total = Variable(default_value=ZERO)
+t_total = Variable(default_value=ZERO)
+reward_excluded_r_total = Variable(default_value=ZERO)
+reward_excluded_t_total = Variable(default_value=ZERO)
 approved = Hash(default_value=ZERO)
 fee_targets = Hash(default_value=False)
+
+
+TransferEvent = LogEvent(
+    event='Transfer',
+    params={
+        'from': {'type': str, 'idx': True},
+        'to': {'type': str, 'idx': True},
+        'amount': {'type': (int, float, decimal)},
+        'transfer_amount': {'type': (int, float, decimal)},
+        'burn_amount': {'type': (int, float, decimal)},
+        'reflection_amount': {'type': (int, float, decimal)},
+        'fee_applied': {'type': bool},
+    },
+)
+
+ApproveEvent = LogEvent(
+    event='Approve',
+    params={
+        'owner': {'type': str, 'idx': True},
+        'spender': {'type': str, 'idx': True},
+        'amount': {'type': (int, float, decimal)},
+    },
+)
+
+RewardStatusChangedEvent = LogEvent(
+    event='RewardStatusChanged',
+    params={
+        'address': {'type': str, 'idx': True},
+        'excluded': {'type': bool},
+        'balance': {'type': (int, float, decimal)},
+    },
+)
+
+FeeTargetChangedEvent = LogEvent(
+    event='FeeTargetChanged',
+    params={
+        'address': {'type': str, 'idx': True},
+        'enabled': {'type': bool},
+    },
+)
 
 
 def to_decimal(value):
@@ -22,10 +65,146 @@ def to_decimal(value):
     return decimal(str(value))
 
 
-def get_rate():
+def base_rate():
     true_total = to_decimal(t_total.get())
     assert true_total > ZERO, 'Total supply exhausted'
     return to_decimal(r_total.get()) / true_total
+
+
+def counts_toward_rewards(address: str):
+    return address != BURN_ADDRESS
+
+
+def get_rate():
+    true_total = to_decimal(t_total.get())
+    reflected_total = to_decimal(r_total.get())
+    assert true_total > ZERO, 'Total supply exhausted'
+
+    adjusted_true_total = true_total - to_decimal(reward_excluded_t_total.get())
+    adjusted_reflected_total = reflected_total - to_decimal(
+        reward_excluded_r_total.get()
+    )
+
+    if adjusted_true_total <= ZERO or adjusted_reflected_total <= ZERO:
+        return base_rate()
+
+    return adjusted_reflected_total / adjusted_true_total
+
+
+def increase_excluded_balance(
+    address: str,
+    token_amount,
+    reflected_amount,
+):
+    token_amount = to_decimal(token_amount)
+    reflected_amount = to_decimal(reflected_amount)
+
+    t_balances[address] = to_decimal(t_balances[address]) + token_amount
+    excluded_r_balances[address] = (
+        to_decimal(excluded_r_balances[address]) + reflected_amount
+    )
+
+    if counts_toward_rewards(address):
+        reward_excluded_t_total.set(
+            to_decimal(reward_excluded_t_total.get()) + token_amount
+        )
+        reward_excluded_r_total.set(
+            to_decimal(reward_excluded_r_total.get()) + reflected_amount
+        )
+
+
+def decrease_excluded_balance(
+    address: str,
+    token_amount,
+    reflected_amount,
+):
+    token_amount = to_decimal(token_amount)
+    reflected_amount = to_decimal(reflected_amount)
+
+    current_token_balance = to_decimal(t_balances[address])
+    current_reflected_balance = to_decimal(excluded_r_balances[address])
+
+    assert current_token_balance >= token_amount, 'Not enough coins to send!'
+    assert (
+        current_reflected_balance >= reflected_amount
+    ), 'Excluded reflected balance mismatch!'
+
+    t_balances[address] = current_token_balance - token_amount
+    excluded_r_balances[address] = current_reflected_balance - reflected_amount
+
+    if counts_toward_rewards(address):
+        reward_excluded_t_total.set(
+            to_decimal(reward_excluded_t_total.get()) - token_amount
+        )
+        reward_excluded_r_total.set(
+            to_decimal(reward_excluded_r_total.get()) - reflected_amount
+        )
+
+
+def move_tokens(sender: str, recipient: str, amount, charge_fees: bool):
+    amount_value = to_decimal(amount)
+    assert amount_value > ZERO, 'Cannot send negative balances!'
+
+    rate = get_rate()
+    reflected_amount = amount_value * rate
+
+    if excluded[sender]:
+        decrease_excluded_balance(sender, amount_value, reflected_amount)
+    else:
+        current_sender_balance = to_decimal(balances[sender])
+        assert current_sender_balance >= reflected_amount, 'Not enough coins to send!'
+        balances[sender] = current_sender_balance - reflected_amount
+
+    burn_amount = ZERO
+    reflection_amount = ZERO
+    transfer_amount = amount_value
+
+    if charge_fees:
+        burn_amount = amount_value * BURN_RATE
+        reflection_amount = amount_value * REFLECTION_RATE
+        transfer_amount = amount_value - burn_amount - reflection_amount
+
+    reflected_transfer_amount = transfer_amount * rate
+
+    if excluded[recipient]:
+        increase_excluded_balance(
+            recipient,
+            transfer_amount,
+            reflected_transfer_amount,
+        )
+    else:
+        balances[recipient] = (
+            to_decimal(balances[recipient]) + reflected_transfer_amount
+        )
+
+    if charge_fees:
+        reflected_burn_amount = burn_amount * rate
+        reflected_reflection_amount = reflection_amount * rate
+
+        increase_excluded_balance(
+            BURN_ADDRESS,
+            burn_amount,
+            reflected_burn_amount,
+        )
+
+        t_total.set(to_decimal(t_total.get()) - burn_amount)
+        r_total.set(
+            to_decimal(r_total.get())
+            - reflected_burn_amount
+            - reflected_reflection_amount
+        )
+
+    TransferEvent(
+        {
+            'from': sender,
+            'to': recipient,
+            'amount': amount_value,
+            'transfer_amount': transfer_amount,
+            'burn_amount': burn_amount,
+            'reflection_amount': reflection_amount,
+            'fee_applied': charge_fees,
+        }
+    )
 
 
 @construct
@@ -33,17 +212,27 @@ def seed():
     initial_supply = decimal('100000000')
     r_total.set(initial_supply)
     t_total.set(initial_supply)
+    reward_excluded_r_total.set(ZERO)
+    reward_excluded_t_total.set(ZERO)
     balances[ctx.caller] = initial_supply
 
     excluded[ctx.this] = True
     excluded[BURN_ADDRESS] = True
+    t_balances[ctx.this] = ZERO
+    excluded_r_balances[ctx.this] = ZERO
     t_balances[BURN_ADDRESS] = ZERO
+    excluded_r_balances[BURN_ADDRESS] = ZERO
 
     metadata['token_name'] = "REFLECT TOKEN"
     metadata['token_symbol'] = "RFT"
     metadata['token_logo_url'] = ""
     metadata['token_website'] = ""
     metadata['operator'] = ctx.caller
+
+    assert BURN_RATE >= ZERO and REFLECTION_RATE >= ZERO, 'Invalid fee rates'
+    assert (
+        BURN_RATE + REFLECTION_RATE <= decimal('1')
+    ), 'Combined fee rate must be <= 100%'
 
 
 @export
@@ -54,53 +243,9 @@ def change_metadata(key: str, value: Any):
 
 @export
 def transfer(amount: float, to: str):
-    amount_value = to_decimal(amount)
-    assert amount_value > ZERO, 'Cannot send negative balances!'
-
-    from_excluded = excluded[ctx.caller]
-    to_excluded = excluded[to]
     charge_fees = fee_targets[ctx.caller] or fee_targets[to]
-
-    rate = get_rate()
-    reflected_amount = amount_value * rate
-
-    if from_excluded:
-        assert to_decimal(t_balances[ctx.caller]) >= amount_value, 'Not enough coins to send!'
-        t_balances[ctx.caller] = to_decimal(t_balances[ctx.caller]) - amount_value
-    else:
-        assert to_decimal(balances[ctx.caller]) >= reflected_amount, 'Not enough coins to send!'
-        balances[ctx.caller] = to_decimal(balances[ctx.caller]) - reflected_amount
-
-    burn_amount = ZERO
-    reflection_amount = ZERO
-    transfer_amount = amount_value
-
-    if charge_fees:
-        burn_amount = amount_value * BURN_RATE
-        reflection_amount = amount_value * REFLECTION_RATE
-        transfer_amount = amount_value - burn_amount - reflection_amount
-
-    if from_excluded:
-        if to_excluded:
-            t_balances[to] = to_decimal(t_balances[to]) + transfer_amount
-        else:
-            balances[to] = to_decimal(balances[to]) + transfer_amount * rate
-    else:
-        if to_excluded:
-            t_balances[to] = to_decimal(t_balances[to]) + transfer_amount
-        else:
-            balances[to] = to_decimal(balances[to]) + transfer_amount * rate
-
-    if charge_fees:
-        t_balances[BURN_ADDRESS] = to_decimal(t_balances[BURN_ADDRESS]) + burn_amount
-
-        true_total = to_decimal(t_total.get())
-        reflected_total = to_decimal(r_total.get())
-
-        t_total.set(true_total - burn_amount)
-        r_total.set(reflected_total - (burn_amount + reflection_amount) * rate)
-
-    return f"Transferred {amount_value}"
+    move_tokens(ctx.caller, to, amount, charge_fees)
+    return f"Transferred {to_decimal(amount)}"
 
 
 @export
@@ -108,62 +253,30 @@ def approve(amount: float, to: str):
     amount_value = to_decimal(amount)
     assert amount_value >= ZERO, 'Cannot approve negative balances!'
     approved[ctx.caller, to] = amount_value
+    ApproveEvent(
+        {
+            'owner': ctx.caller,
+            'spender': to,
+            'amount': amount_value,
+        }
+    )
     return f"Approved {amount_value} for {to}"
 
 
 @export
 def transfer_from(amount: float, to: str, main_account: str):
     amount_value = to_decimal(amount)
-    assert amount_value > ZERO, 'Cannot send negative balances!'
-
     spender_allowance = to_decimal(approved[main_account, ctx.caller])
     assert spender_allowance >= amount_value, 'Not enough coins approved!'
 
-    from_excluded = excluded[main_account]
-    to_excluded = excluded[to]
-    charge_fees = fee_targets[ctx.caller] or fee_targets[to] or fee_targets[main_account]
-
-    rate = get_rate()
-    reflected_amount = amount_value * rate
-
-    if from_excluded:
-        assert to_decimal(t_balances[main_account]) >= amount_value, 'Not enough coins!'
-        t_balances[main_account] = to_decimal(t_balances[main_account]) - amount_value
-    else:
-        assert to_decimal(balances[main_account]) >= reflected_amount, 'Not enough coins!'
-        balances[main_account] = to_decimal(balances[main_account]) - reflected_amount
-
-    burn_amount = ZERO
-    reflection_amount = ZERO
-    transfer_amount = amount_value
-
-    if charge_fees:
-        burn_amount = amount_value * BURN_RATE
-        reflection_amount = amount_value * REFLECTION_RATE
-        transfer_amount = amount_value - burn_amount - reflection_amount
-
     approved[main_account, ctx.caller] = spender_allowance - amount_value
 
-    if from_excluded:
-        if to_excluded:
-            t_balances[to] = to_decimal(t_balances[to]) + transfer_amount
-        else:
-            balances[to] = to_decimal(balances[to]) + transfer_amount * rate
-    else:
-        if to_excluded:
-            t_balances[to] = to_decimal(t_balances[to]) + transfer_amount
-        else:
-            balances[to] = to_decimal(balances[to]) + transfer_amount * rate
-
-    if charge_fees:
-        t_balances[BURN_ADDRESS] = to_decimal(t_balances[BURN_ADDRESS]) + burn_amount
-
-        true_total = to_decimal(t_total.get())
-        reflected_total = to_decimal(r_total.get())
-
-        t_total.set(true_total - burn_amount)
-        r_total.set(reflected_total - (burn_amount + reflection_amount) * rate)
-
+    charge_fees = (
+        fee_targets[ctx.caller]
+        or fee_targets[to]
+        or fee_targets[main_account]
+    )
+    move_tokens(main_account, to, amount_value, charge_fees)
     return f"Sent {amount_value} to {to} from {main_account}"
 
 
@@ -172,10 +285,11 @@ def balance_of(address: str):
     if excluded[address]:
         return to_decimal(t_balances[address])
 
-    rate = get_rate()
-    if rate == ZERO:
+    reflected_balance = to_decimal(balances[address])
+    if reflected_balance == ZERO:
         return ZERO
-    return to_decimal(balances[address]) / rate
+
+    return reflected_balance / get_rate()
 
 
 @export
@@ -189,30 +303,79 @@ def get_total_supply():
 
 
 @export
+def is_excluded_from_rewards(address: str):
+    return excluded[address]
+
+
+@export
+def is_fee_target(address: str):
+    return fee_targets[address]
+
+
+@export
 def exclude_from_rewards(address: str):
     assert ctx.caller == metadata['operator'], 'Only operator can exclude!'
     assert not excluded[address], 'Address already excluded!'
 
-    excluded[address] = True
     token_amount = balance_of(address)
+    reflected_balance = to_decimal(balances[address])
+
+    excluded[address] = True
     balances[address] = ZERO
     t_balances[address] = token_amount
+    excluded_r_balances[address] = reflected_balance
+
+    if counts_toward_rewards(address):
+        reward_excluded_t_total.set(
+            to_decimal(reward_excluded_t_total.get()) + token_amount
+        )
+        reward_excluded_r_total.set(
+            to_decimal(reward_excluded_r_total.get()) + reflected_balance
+        )
+
+    RewardStatusChangedEvent(
+        {
+            'address': address,
+            'excluded': True,
+            'balance': token_amount,
+        }
+    )
 
 
 @export
 def include_in_rewards(address: str):
     assert ctx.caller == metadata['operator'], 'Only operator can include!'
     assert excluded[address], 'Address not excluded!'
+    assert address != ctx.this, 'Contract balance must stay excluded!'
+    assert address != BURN_ADDRESS, 'Burn address must stay excluded!'
 
     token_amount = to_decimal(t_balances[address])
-    rate = get_rate()
+    reflected_balance = to_decimal(excluded_r_balances[address])
+
+    if counts_toward_rewards(address):
+        reward_excluded_t_total.set(
+            to_decimal(reward_excluded_t_total.get()) - token_amount
+        )
+        reward_excluded_r_total.set(
+            to_decimal(reward_excluded_r_total.get()) - reflected_balance
+        )
 
     excluded[address] = False
     t_balances[address] = ZERO
-    balances[address] = token_amount * rate
+    excluded_r_balances[address] = ZERO
+    balances[address] = token_amount * get_rate()
+
+    RewardStatusChangedEvent(
+        {
+            'address': address,
+            'excluded': False,
+            'balance': token_amount,
+        }
+    )
 
 
 @export
 def set_fee_target(address: str, enabled: bool):
     assert ctx.caller == metadata['operator'], 'Only operator can change fee targets!'
     fee_targets[address] = enabled
+    FeeTargetChangedEvent({'address': address, 'enabled': enabled})

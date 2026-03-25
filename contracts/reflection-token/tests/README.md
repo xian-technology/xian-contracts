@@ -1,12 +1,11 @@
 # Tests
 
-This package does not have automated tests yet.
+This package has package-local automated coverage in
+`tests/test_reflection_token.py`.
 
-Current validation comes from the repo-wide lint and compile checks in
-`scripts/validate_contracts.py`.
+Current coverage includes:
 
-Useful next tests would cover:
-
-- plain wallet transfers without fees
-- DEX-targeted transfers with burn and reflection
-- include/exclude reward flows
+- exclusion preserving balances
+- excluded DEX pool accounting under fee-bearing transfers
+- include/exclude round-trips
+- approval and `transfer_from` fee behavior
