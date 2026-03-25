@@ -14,8 +14,8 @@ Fee-on-transfer reflection token designed to work with the Xian DEX.
 ## Notes
 
 - Fees only apply when either party is marked as a fee target.
-- DEX integration requires setting the pair and router as fee targets before
-  liquidity is added.
+- DEX integration requires setting the relevant pair-facing address or addresses
+  as fee targets before liquidity is added.
 - Excluding pool addresses from rewards is part of the normal setup.
 - Excluded balances are tracked explicitly so excluded pools do not distort the
   reflection rate basis.
@@ -24,8 +24,9 @@ Fee-on-transfer reflection token designed to work with the Xian DEX.
   taxed too, so adding liquidity with the reflection token side also deposits a
   post-fee amount into the pool.
 - Removing liquidity from that same pair also transfers the reflection token out
-  of a fee-target address, so the wallet receives the post-fee token amount even
-  though the raw DEX burn calculation is based on the pre-fee amount.
+  of a fee-target address, so the wallet receives the post-fee token amount.
+- The current DEX router returns actual credited and received amounts for these
+  liquidity flows, which is the behavior the package tests validate.
 - Swaps should use the DEX fee-on-transfer path,
   `swapExactTokenForTokenSupportingFeeOnTransferTokens(...)`, for both buys and
   sells.

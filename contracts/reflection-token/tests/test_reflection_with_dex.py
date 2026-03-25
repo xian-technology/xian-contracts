@@ -155,8 +155,8 @@ class TestReflectionTokenWithDex(unittest.TestCase):
     def test_validated_pair_setup_buy_and_sell_flow(self):
         pair, pair_id, add_liquidity = self.bootstrap_pair()
         self.assertEqual(pair, 1)
-        self.assertEqual(add_liquidity[0], 1000)
-        self.assertEqual(add_liquidity[1], 1000)
+        self.assertAmountEqual(add_liquidity[0], "950")
+        self.assertAmountEqual(add_liquidity[1], "1000")
         self.assertGreater(add_liquidity[2], ContractingDecimal("0"))
         reserves = self.pairs.getReserves(pair=pair_id, signer=self.operator)
         self.assertAmountEqual(reserves[0], "950")
@@ -241,7 +241,8 @@ class TestReflectionTokenWithDex(unittest.TestCase):
 
         self.assertGreater(currency_after, currency_before)
         self.assertGreater(reflection_after, reflection_before)
-        self.assertLess(reflection_after - reflection_before, removed[0])
+        self.assertAmountEqual(reflection_after - reflection_before, removed[0])
+        self.assertAmountEqual(currency_after - currency_before, removed[1])
         self.assertGreater(currency_after - currency_before, ContractingDecimal("0"))
 
     def test_helper_buy_and_sell_flow(self):
