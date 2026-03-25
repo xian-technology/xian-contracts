@@ -62,7 +62,7 @@ def assert_is_not_expired(name: str):
     assert not is_expired(name), "Name is expired"
 
 def assert_is_enabled():
-    assert enabled.get() == True, "Contract is not enabled"
+    assert enabled.get(), "Contract is not enabled"
 
 
 # User functions
@@ -71,9 +71,9 @@ def assert_is_enabled():
 def mint_name(name: str):
     assert_is_enabled()
     assert_if_contract_is_approved(ctx.caller)
-    assert_is_not_blacklisted(name)
 
     name = name.lower()
+    assert_is_not_blacklisted(name)
     assert name.isalnum() and name.isascii(), "Name must be alphanumeric and ascii"
     assert len(name) >= 3, "The minimum length is 3 characters"
     assert len(name) <= 32, "The maximum length is 32 characters"  

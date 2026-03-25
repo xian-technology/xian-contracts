@@ -4,6 +4,7 @@ I = importlib
 def is_XSC001(contract: str):
     # Import the contract to validate
     token = I.import_module(contract)
+    metadata = ForeignHash(foreign_contract=contract, foreign_name='metadata')
     
     # Check required state variables exist
     required_variables = [
@@ -13,7 +14,6 @@ def is_XSC001(contract: str):
 
     # Check required functions with correct signatures exist
     required_functions = [
-        I.Func('seed'),
         I.Func('change_metadata', args=('key', 'value')),
         I.Func('transfer', args=('amount', 'to')), 
         I.Func('approve', args=('amount', 'to')),
@@ -36,7 +36,7 @@ def is_XSC001(contract: str):
     ]
 
     for field in required_metadata:
-        if token.metadata[field] is None:
+        if metadata[field] is None:
             return False
 
     return True

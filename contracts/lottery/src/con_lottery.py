@@ -1,11 +1,10 @@
-random.seed()
-
 data = Hash(default_value='')
 
 
 @export
 def lottery_start(lottery_id: int, token_contract: str, total_amount: float):
     assert data[lottery_id] == '', 'Lottery with this ID already exists!'
+    assert total_amount > 0, 'Lottery amount must be positive!'
 
     importlib.import_module(token_contract).transfer_from(
         main_account=ctx.caller,

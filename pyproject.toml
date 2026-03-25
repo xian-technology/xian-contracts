@@ -1,0 +1,33 @@
+[project]
+name = "xian-contracts-hub"
+version = "0.1.0"
+description = "Curated contract hub for Xian"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "xian-contracting>=1.0.1,<2",
+    "xian-linter>=0.3.0,<1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2,<10",
+    "ruff>=0.15.6,<0.16",
+]
+
+[tool.uv.sources]
+xian-contracting = { path = "../xian-contracting", editable = true }
+xian-linter = { path = "../xian-linter", editable = true }
+
+[tool.pytest.ini_options]
+testpaths = ["contracts"]
+python_files = ["test_*.py"]
+
+[tool.ruff]
+line-length = 80
+target-version = "py312"
+extend-exclude = ["contracts/*/src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = ["E501"]

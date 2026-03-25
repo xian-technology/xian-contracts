@@ -1,9 +1,8 @@
 import unittest
-import os
+from pathlib import Path
 
 from contracting.client import ContractingClient
-from contracting.stdlib.bridge.time import Datetime
-from contracting.stdlib.bridge.decimal import ContractingDecimal
+from xian_runtime_types.time import Datetime
 
 
 class TestStakingContract(unittest.TestCase):
@@ -13,7 +12,8 @@ class TestStakingContract(unittest.TestCase):
         self.client.flush()
         
         # Load and submit the staking contract
-        with open('con_staking.py') as f:
+        contract_path = Path(__file__).resolve().parents[1] / 'src' / 'con_staking.py'
+        with contract_path.open() as f:
             contract_code = f.read()
         self.client.submit(contract_code, name='con_staking_test')
         
@@ -126,9 +126,7 @@ def approve(amount: float, to: str):
 
     def test_create_pool_with_all_params(self):
         """Test pool creation with all optional parameters"""
-        future_time = Datetime(year=2024, month=1, day=2, hour=12, minute=0, second=0)
-        
-        result = self.staking.create_pool(
+        self.staking.create_pool(
             stake_token='con_stake_token',
             reward_token='con_reward_token',
             apy=15.0,
@@ -336,7 +334,7 @@ def approve(amount: float, to: str):
         )
         
         # Stake
-        result = self.staking.stake(
+        self.staking.stake(
             pool_id='0',
             signer=self.staker1,
             environment={"now": self.test_time},
