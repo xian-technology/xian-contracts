@@ -9,3 +9,4 @@ Current coverage includes:
 - excluded DEX pool accounting under fee-bearing transfers
 - include/exclude round-trips
 - approval and `transfer_from` fee behavior
+- end-to-end DEX setup, liquidity add, buy flow, and sell flow
