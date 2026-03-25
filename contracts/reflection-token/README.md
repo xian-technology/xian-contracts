@@ -23,9 +23,14 @@ Fee-on-transfer reflection token designed to work with the Xian DEX.
   reward-excluded pool address. Under that model, transfers into the pair are
   taxed too, so adding liquidity with the reflection token side also deposits a
   post-fee amount into the pool.
+- Removing liquidity from that same pair also transfers the reflection token out
+  of a fee-target address, so the wallet receives the post-fee token amount even
+  though the raw DEX burn calculation is based on the pre-fee amount.
 - Swaps should use the DEX fee-on-transfer path,
   `swapExactTokenForTokenSupportingFeeOnTransferTokens(...)`, for both buys and
   sells.
+- The helper contract path is validated too, but it needs wider slippage than a
+  normal token because reflection fees affect the pair-facing leg.
 
 ## Validation
 

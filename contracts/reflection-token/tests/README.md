@@ -10,3 +10,5 @@ Current coverage includes:
 - include/exclude round-trips
 - approval and `transfer_from` fee behavior
 - end-to-end DEX setup, liquidity add, buy flow, and sell flow
+- remove-liquidity behavior against a fee-target pair
+- helper-contract buy and sell flows

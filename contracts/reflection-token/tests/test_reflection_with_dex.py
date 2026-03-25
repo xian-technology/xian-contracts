@@ -10,6 +10,7 @@ CONTRACTS_ROOT = ROOT.parent
 REFLECTION_PATH = ROOT / "src" / "con_reflection_token.py"
 DEX_PAIRS_PATH = CONTRACTS_ROOT / "dex" / "src" / "con_pairs.py"
 DEX_ROUTER_PATH = CONTRACTS_ROOT / "dex" / "src" / "con_dex.py"
+DEX_HELPER_PATH = CONTRACTS_ROOT / "dex" / "src" / "con_dex_helper.py"
 
 TOKEN_CODE = """
 balances = Hash(default_value=0)
@@ -65,12 +66,15 @@ class TestReflectionTokenWithDex(unittest.TestCase):
             self.client.submit(f.read(), name="con_pairs")
         with DEX_ROUTER_PATH.open() as f:
             self.client.submit(f.read(), name="con_dex")
+        with DEX_HELPER_PATH.open() as f:
+            self.client.submit(f.read(), name="con_dex_helper")
         with REFLECTION_PATH.open() as f:
             self.client.submit(f.read(), name="con_reflection_token")
         self.client.submit(TOKEN_CODE, name="currency")
 
         self.pairs = self.client.get_contract("con_pairs")
         self.dex = self.client.get_contract("con_dex")
+        self.helper = self.client.get_contract("con_dex_helper")
         self.reflection = self.client.get_contract("con_reflection_token")
         self.currency = self.client.get_contract("currency")
 
@@ -89,6 +93,16 @@ class TestReflectionTokenWithDex(unittest.TestCase):
             )
             self.currency.approve(amount=5000, to="con_dex", signer=account)
             self.reflection.approve(amount=5000, to="con_dex", signer=account)
+            self.currency.approve(
+                amount=5000,
+                to="con_dex_helper",
+                signer=account,
+            )
+            self.reflection.approve(
+                amount=5000,
+                to="con_dex_helper",
+                signer=account,
+            )
 
     def tearDown(self):
         self.client.flush()
@@ -101,13 +115,12 @@ class TestReflectionTokenWithDex(unittest.TestCase):
             difference = -difference
         self.assertLessEqual(difference, ContractingDecimal("0.00001"))
 
-    def test_validated_pair_setup_buy_and_sell_flow(self):
+    def bootstrap_pair(self):
         pair = self.pairs.createPair(
             tokenA="con_reflection_token",
             tokenB="currency",
             signer=self.operator,
         )
-        self.assertEqual(pair, 1)
 
         self.reflection.exclude_from_rewards(
             address="con_pairs",
@@ -131,15 +144,20 @@ class TestReflectionTokenWithDex(unittest.TestCase):
             signer=self.lp,
             environment={"now": self.now},
         )
-        self.assertEqual(add_liquidity[0], 1000)
-        self.assertEqual(add_liquidity[1], 1000)
-        self.assertGreater(add_liquidity[2], ContractingDecimal("0"))
 
         pair_id = self.pairs.pairFor(
             tokenA="con_reflection_token",
             tokenB="currency",
             signer=self.operator,
         )
+        return pair, pair_id, add_liquidity
+
+    def test_validated_pair_setup_buy_and_sell_flow(self):
+        pair, pair_id, add_liquidity = self.bootstrap_pair()
+        self.assertEqual(pair, 1)
+        self.assertEqual(add_liquidity[0], 1000)
+        self.assertEqual(add_liquidity[1], 1000)
+        self.assertGreater(add_liquidity[2], ContractingDecimal("0"))
         reserves = self.pairs.getReserves(pair=pair_id, signer=self.operator)
         self.assertAmountEqual(reserves[0], "950")
         self.assertAmountEqual(reserves[1], "1000")
@@ -174,6 +192,99 @@ class TestReflectionTokenWithDex(unittest.TestCase):
         self.assertGreater(
             self.currency.balance_of(address=self.trader, signer=self.operator),
             ContractingDecimal("5000"),
+        )
+
+        reserves_after = self.pairs.getReserves(pair=pair_id, signer=self.operator)
+        self.assertGreater(reserves_after[0], ContractingDecimal("0"))
+        self.assertGreater(reserves_after[1], ContractingDecimal("0"))
+
+    def test_remove_liquidity_returns_currency_and_post_fee_reflection(self):
+        _, pair_id, add_liquidity = self.bootstrap_pair()
+        liquidity = add_liquidity[2]
+
+        self.pairs.liqApprove(
+            pair=pair_id,
+            amount=liquidity,
+            to="con_dex",
+            signer=self.lp,
+        )
+
+        reflection_before = self.reflection.balance_of(
+            address=self.lp,
+            signer=self.operator,
+        )
+        currency_before = self.currency.balance_of(
+            address=self.lp,
+            signer=self.operator,
+        )
+
+        removed = self.dex.removeLiquidity(
+            tokenA="con_reflection_token",
+            tokenB="currency",
+            liquidity=liquidity,
+            amountAMin=1,
+            amountBMin=1,
+            to=self.lp,
+            deadline=self.deadline,
+            signer=self.lp,
+            environment={"now": self.now},
+        )
+
+        reflection_after = self.reflection.balance_of(
+            address=self.lp,
+            signer=self.operator,
+        )
+        currency_after = self.currency.balance_of(
+            address=self.lp,
+            signer=self.operator,
+        )
+
+        self.assertGreater(currency_after, currency_before)
+        self.assertGreater(reflection_after, reflection_before)
+        self.assertLess(reflection_after - reflection_before, removed[0])
+        self.assertGreater(currency_after - currency_before, ContractingDecimal("0"))
+
+    def test_helper_buy_and_sell_flow(self):
+        _, pair_id, _ = self.bootstrap_pair()
+
+        trader_reflection_before = self.reflection.balance_of(
+            address=self.trader,
+            signer=self.operator,
+        )
+        helper_buy = self.helper.buy(
+            buy_token="con_reflection_token",
+            sell_token="currency",
+            amount=50,
+            slippage=10,
+            deadline_min=5,
+            signer=self.trader,
+            environment={"now": self.now},
+        )
+        self.assertGreater(helper_buy[0], ContractingDecimal("0"))
+        self.assertGreater(helper_buy[1], ContractingDecimal("0"))
+        self.assertGreater(
+            self.reflection.balance_of(address=self.trader, signer=self.operator),
+            trader_reflection_before,
+        )
+
+        trader_currency_before = self.currency.balance_of(
+            address=self.trader,
+            signer=self.operator,
+        )
+        helper_sell = self.helper.sell(
+            sell_token="con_reflection_token",
+            buy_token="currency",
+            amount=50,
+            slippage=10,
+            deadline_min=5,
+            signer=self.trader,
+            environment={"now": self.now},
+        )
+        self.assertEqual(helper_sell[0], 50)
+        self.assertGreater(helper_sell[1], ContractingDecimal("0"))
+        self.assertGreater(
+            self.currency.balance_of(address=self.trader, signer=self.operator),
+            trader_currency_before,
         )
 
         reserves_after = self.pairs.getReserves(pair=pair_id, signer=self.operator)
