@@ -257,7 +257,7 @@ class TestReflectionTokenWithDex(unittest.TestCase):
             sell_token="currency",
             amount=50,
             slippage=10,
-            deadline_min=5,
+            deadline=self.deadline,
             signer=self.trader,
             environment={"now": self.now},
         )
@@ -277,7 +277,7 @@ class TestReflectionTokenWithDex(unittest.TestCase):
             buy_token="currency",
             amount=50,
             slippage=10,
-            deadline_min=5,
+            deadline=self.deadline,
             signer=self.trader,
             environment={"now": self.now},
         )

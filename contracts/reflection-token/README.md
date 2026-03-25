@@ -30,8 +30,9 @@ Fee-on-transfer reflection token designed to work with the Xian DEX.
 - Swaps should use the DEX fee-on-transfer path,
   `swapExactTokenForTokenSupportingFeeOnTransferTokens(...)`, for both buys and
   sells.
-- The helper contract path is validated too, but it needs wider slippage than a
-  normal token because reflection fees affect the pair-facing leg.
+- The helper contract path is validated too. It now expects an explicit
+  absolute deadline and still needs wider slippage than a normal token because
+  reflection fees affect the pair-facing leg.
 
 ## Validation
 
