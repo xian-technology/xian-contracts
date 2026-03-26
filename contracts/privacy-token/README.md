@@ -18,6 +18,7 @@ commitments.
 - Relationship graph and update timing remain public.
 - It is valuable as a research or integration prototype, not as a production
   privacy primitive.
+- For the real shielded-note path, see `contracts/shielded-note-token/`.
 
 ## Validation
 

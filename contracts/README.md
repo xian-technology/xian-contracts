@@ -22,6 +22,7 @@ This folder contains the curated contract packages in `xian-contracts`.
 - `lottery/`: simple lottery example
 - `nameservice/`: renewable name registry
 - `privacy-token/`: commitment-based privacy token experiment
+- `shielded-note-token/`: root/nullifier/note-based shielded token contract
 - `reflection-token/`: fee-on-transfer reflection token
 - `staking/`: multi-pool staking system
 - `xsc001/`: token interface checker
