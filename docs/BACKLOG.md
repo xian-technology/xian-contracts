@@ -8,6 +8,9 @@
   `shielded-note-token`.
 - Add integration coverage for `shielded-note-token` against real verifier
   vectors instead of mocked verifier outcomes.
+- Add broader integration coverage for `stream-payments` against a permit-aware
+  token once a common permit surface is standardized across curated token
+  packages.
 - Add at least smoke coverage for `lottery` if it remains in the curated hub.
 - Review whether `dex` should be split into a cleaner `v2`-style package with
   stronger test coverage and more current code style.

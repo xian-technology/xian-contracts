@@ -24,5 +24,6 @@ This folder contains the curated contract packages in `xian-contracts`.
 - `privacy-token/`: commitment-based privacy token experiment
 - `shielded-note-token/`: root/nullifier/note-based shielded token contract
 - `reflection-token/`: fee-on-transfer reflection token
+- `stream-payments/`: standalone escrowed token streaming contract
 - `staking/`: multi-pool staking system
 - `xsc001/`: token interface checker

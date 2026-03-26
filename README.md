@@ -32,6 +32,7 @@ uv run pytest -m slow
 | `contracts/staking` | curated | Multi-pool staking contract with reward deposits and emergency controls |
 | `contracts/xsc001` | curated | Token interface checker contract |
 | `contracts/dex` | candidate | Multi-contract DEX package with pairs, router, and helper contracts |
+| `contracts/stream-payments` | candidate | Standalone escrowed token-stream contract extracted from legacy XSC003-style logic |
 | `contracts/shielded-note-token` | candidate | Root/nullifier/note-based shielded token contract with registry-backed zk verification ids |
 | `contracts/reflection-token` | candidate | Reflection token designed to integrate with the Xian DEX |
 | `contracts/privacy-token` | experimental | Commitment-based token experiment without zero-knowledge proofs |
