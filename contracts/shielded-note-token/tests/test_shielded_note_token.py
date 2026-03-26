@@ -6,6 +6,15 @@ import pytest
 from contracting.client import ContractingClient
 
 pytest.importorskip("xian_zk")
+from xian_zk import (
+    ShieldedDepositRequest,
+    ShieldedNote,
+    ShieldedNoteProver,
+    ShieldedTransferRequest,
+    ShieldedWithdrawRequest,
+    asset_id_for_contract,
+    scan_notes,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACT_PATH = ROOT / "src" / "con_shielded_note_token.py"
@@ -23,6 +32,10 @@ ZK_REGISTRY_PATH = (
 
 def load_fixture():
     return json.loads(FIXTURE_PATH.read_text())
+
+
+def field(value: int) -> str:
+    return f"0x{value:064x}"
 
 
 class TestShieldedNoteToken(unittest.TestCase):
@@ -298,3 +311,131 @@ class TestShieldedNoteToken(unittest.TestCase):
                 root=withdraw["expected_new_root"], signer="sys"
             )
         )
+
+    def test_real_proving_toolkit_drives_the_contract(self):
+        prover = ShieldedNoteProver.build_insecure_dev_bundle()
+        self.assertEqual(
+            asset_id_for_contract("con_shielded_note_token"),
+            self.token.asset_id(signer="sys"),
+        )
+
+        self.token.mint_public(amount=100, to=self.alice, signer="sys")
+
+        alice_note_1 = ShieldedNote(
+            owner_secret=field(101),
+            amount=40,
+            rho=field(1001),
+            blind=field(2001),
+        )
+        alice_note_2 = ShieldedNote(
+            owner_secret=field(101),
+            amount=30,
+            rho=field(1002),
+            blind=field(2002),
+        )
+        bob_note_1 = ShieldedNote(
+            owner_secret=field(202),
+            amount=25,
+            rho=field(1003),
+            blind=field(2003),
+        )
+        alice_note_3 = ShieldedNote(
+            owner_secret=field(101),
+            amount=45,
+            rho=field(1004),
+            blind=field(2004),
+        )
+        alice_note_4 = ShieldedNote(
+            owner_secret=field(101),
+            amount=25,
+            rho=field(1005),
+            blind=field(2005),
+        )
+
+        deposit = prover.prove_deposit(
+            ShieldedDepositRequest(
+                asset_id=self.token.asset_id(signer="sys"),
+                old_commitments=[],
+                amount=70,
+                outputs=[alice_note_1.to_output(), alice_note_2.to_output()],
+            )
+        )
+        deposit_result = self.token.deposit_shielded(
+            amount=70,
+            old_root=deposit.old_root,
+            output_commitments=deposit.output_commitments,
+            proof_hex=deposit.proof_hex,
+            signer=self.alice,
+        )
+        self.assertEqual(deposit_result["new_root"], deposit.expected_new_root)
+
+        discovered_after_deposit = scan_notes(
+            asset_id=self.token.asset_id(signer="sys"),
+            commitments=deposit.output_commitments,
+            notes=[alice_note_1, alice_note_2],
+        )
+        self.assertEqual(
+            [note.leaf_index for note in discovered_after_deposit],
+            [0, 1],
+        )
+
+        transfer = prover.prove_transfer(
+            ShieldedTransferRequest(
+                asset_id=self.token.asset_id(signer="sys"),
+                old_commitments=deposit.output_commitments,
+                inputs=[
+                    match.to_input() for match in discovered_after_deposit
+                ],
+                outputs=[bob_note_1.to_output(), alice_note_3.to_output()],
+            )
+        )
+        transfer_result = self.token.transfer_shielded(
+            old_root=transfer.old_root,
+            input_nullifiers=transfer.input_nullifiers,
+            output_commitments=transfer.output_commitments,
+            proof_hex=transfer.proof_hex,
+            signer=self.alice,
+        )
+        self.assertEqual(transfer_result["new_root"], transfer.expected_new_root)
+
+        commitments_after_transfer = (
+            deposit.output_commitments + transfer.output_commitments
+        )
+        discovered_after_transfer = scan_notes(
+            asset_id=self.token.asset_id(signer="sys"),
+            commitments=commitments_after_transfer,
+            notes=[alice_note_3],
+        )
+        self.assertEqual(
+            [note.leaf_index for note in discovered_after_transfer],
+            [3],
+        )
+
+        withdraw = prover.prove_withdraw(
+            ShieldedWithdrawRequest(
+                asset_id=self.token.asset_id(signer="sys"),
+                old_commitments=commitments_after_transfer,
+                amount=20,
+                recipient=self.bob,
+                inputs=[discovered_after_transfer[0].to_input()],
+                outputs=[alice_note_4.to_output()],
+            )
+        )
+        withdraw_result = self.token.withdraw_shielded(
+            amount=20,
+            to=self.bob,
+            old_root=withdraw.old_root,
+            input_nullifiers=withdraw.input_nullifiers,
+            output_commitments=withdraw.output_commitments,
+            proof_hex=withdraw.proof_hex,
+            signer=self.alice,
+        )
+        self.assertEqual(withdraw_result["new_root"], withdraw.expected_new_root)
+
+        self.assertEqual(self.token.balance_of(account=self.alice, signer="sys"), 30)
+        self.assertEqual(self.token.balance_of(account=self.bob, signer="sys"), 20)
+        self.assertEqual(
+            self.token.current_shielded_root(signer="sys"),
+            withdraw.expected_new_root,
+        )
+        self.assertSupply(total=100, public=50, shielded=50)

@@ -56,15 +56,16 @@ The contract exposes:
 
 - `zk_registry` system contract from `xian-contracting`
 - contract-side `zk` stdlib bridge
-- real proving fixtures and circuit definitions from `xian-zk`
+- real proving circuits, dev proving bundles, and note helpers from `xian-zk`
 
 ## Caveats
 
 - This is the first real proof-backed version, but it is still `candidate`.
 - The current tree capacity is intentionally fixed and small while the proving
   model matures.
-- The package does not yet ship wallet-side note scanning, note encryption, or
-  production witness-generation UX.
+- The package now has a first wallet-side proving and note-scanning path
+  through `xian-zk`, but it still lacks note encryption, viewing keys, and a
+  polished end-user wallet UX.
 - This contract is materially stronger than the earlier privacy-token
   experiments, but it is not yet a polished end-user privacy asset stack.
 
@@ -73,3 +74,4 @@ The contract exposes:
 - repo-wide lint and compile checks
 - package-local proof-backed tests in `tests/test_shielded_note_token.py`
 - deterministic proving fixture in `tests/fixtures/shielded_note_flow.json`
+- end-to-end proving-toolkit flow in `tests/test_shielded_note_token.py`
