@@ -5,7 +5,7 @@ description = "Curated contract hub for Xian"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "xian-contracting>=1.0.1,<2",
+    "xian-contracting[zk]>=1.0.1,<2",
     "xian-linter>=0.3.0,<1",
 ]
 

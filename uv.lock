@@ -398,6 +398,11 @@ dependencies = [
     { name = "xian-runtime-types" },
 ]
 
+[package.optional-dependencies]
+zk = [
+    { name = "xian-zk" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "autopep8", specifier = ">=1.5.7,<2" },
@@ -422,7 +427,7 @@ name = "xian-contracts-hub"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
-    { name = "xian-contracting" },
+    { name = "xian-contracting", extra = ["zk"] },
     { name = "xian-linter" },
 ]
 
@@ -434,7 +439,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "xian-contracting", editable = "../xian-contracting" },
+    { name = "xian-contracting", extras = ["zk"], editable = "../xian-contracting" },
     { name = "xian-linter", editable = "../xian-linter" },
 ]
 
@@ -474,3 +479,16 @@ dev = [
 name = "xian-runtime-types"
 version = "0.1.0"
 source = { editable = "../xian-contracting/packages/xian-runtime-types" }
+
+[[package]]
+name = "xian-zk"
+version = "0.1.0"
+source = { editable = "../xian-contracting/packages/xian-zk" }
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "maturin", specifier = ">=1.8,<2" },
+    { name = "pytest", specifier = ">=9.0.2,<10" },
+]
