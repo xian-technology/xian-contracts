@@ -312,6 +312,7 @@ class TestShieldedNoteToken(unittest.TestCase):
             )
         )
 
+    @pytest.mark.slow
     def test_real_proving_toolkit_drives_the_contract(self):
         prover = ShieldedNoteProver.build_insecure_dev_bundle()
         self.assertEqual(

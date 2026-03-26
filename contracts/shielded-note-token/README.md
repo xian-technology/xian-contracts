@@ -75,3 +75,10 @@ The contract exposes:
 - package-local proof-backed tests in `tests/test_shielded_note_token.py`
 - deterministic proving fixture in `tests/fixtures/shielded_note_flow.json`
 - end-to-end proving-toolkit flow in `tests/test_shielded_note_token.py`
+
+The full proving-toolkit flow is marked `slow` and is excluded from the
+default repo `pytest` run. Run it explicitly with:
+
+```bash
+uv run pytest -q -m slow contracts/shielded-note-token/tests/test_shielded_note_token.py
+```

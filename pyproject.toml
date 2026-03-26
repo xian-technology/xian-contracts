@@ -22,6 +22,10 @@ xian-linter = { path = "../xian-linter", editable = true }
 [tool.pytest.ini_options]
 testpaths = ["contracts"]
 python_files = ["test_*.py"]
+addopts = "-m \"not slow\""
+markers = [
+    "slow: proof-generation and end-to-end proving flows",
+]
 
 [tool.ruff]
 line-length = 80

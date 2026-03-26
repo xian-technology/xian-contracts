@@ -11,6 +11,7 @@ surface.
 uv sync --group dev
 uv run python scripts/validate_contracts.py
 uv run pytest
+uv run pytest -m slow
 ```
 
 ## Scope
@@ -48,7 +49,12 @@ uv run pytest
 uv sync --group dev
 uv run python scripts/validate_contracts.py
 uv run pytest
+uv run pytest -m slow
 ```
+
+The default `pytest` path excludes the slow proof-generation tests. Run
+`pytest -m slow` explicitly when you want the heavy shielded-note proving
+flows.
 
 ## Related Docs
 
