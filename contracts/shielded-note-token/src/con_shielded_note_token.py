@@ -1,3 +1,6 @@
+import zk_registry
+
+
 FIELD_MODULUS = (
     21888242871839275222246405745257275088548364400416034343698204186575808495617
 )
@@ -5,10 +8,12 @@ FIELD_ZERO_HEX = "0x" + "00" * 32
 MIMC_ROUNDS = 91
 MAX_INPUT_NULLIFIERS = 4
 MAX_OUTPUT_COMMITMENTS = 4
-SHIELDED_TREE_DEPTH = 5
+SHIELDED_TREE_DEPTH = 20
 MAX_NOTE_LEAVES = 2**SHIELDED_TREE_DEPTH
 MAX_NOTE_AMOUNT = 2**64 - 1
 MAX_ROOT_HISTORY_WINDOW = 64
+MAX_COMMITMENT_PAGE_SIZE = 128
+MAX_OUTPUT_PAYLOAD_BYTES = 4096
 
 
 def require_positive_amount(amount: int):
@@ -136,27 +141,17 @@ def nullifier_hex(asset_id: str, owner_secret: str, rho: str):
     )
 
 
-def merkle_root_from_commitments(commitments: list):
-    leaves = []
-    for commitment in commitments:
-        require_field_hex32("commitment", commitment)
-        leaves.append(commitment)
-
-    while len(leaves) < MAX_NOTE_LEAVES:
-        leaves.append(FIELD_ZERO_HEX)
-
-    assert len(leaves) == MAX_NOTE_LEAVES, "Unexpected leaf count!"
-
-    while len(leaves) > 1:
-        next_level = []
-        for index in range(0, len(leaves), 2):
-            next_level.append(mimc_hash_pair_hex(leaves[index], leaves[index + 1]))
-        leaves = next_level
-
-    return leaves[0]
+def build_zero_hashes():
+    hashes = [FIELD_ZERO_HEX]
+    current = FIELD_ZERO_HEX
+    for level_index in range(SHIELDED_TREE_DEPTH):
+        current = mimc_hash_pair_hex(current, current)
+        hashes.append(current)
+    return hashes
 
 
-ZERO_ROOT = merkle_root_from_commitments([])
+ZERO_HASHES = build_zero_hashes()
+ZERO_ROOT = ZERO_HASHES[SHIELDED_TREE_DEPTH]
 
 
 def contract_asset_id():
@@ -178,6 +173,11 @@ def require_action(action: str):
 
 def require_root(root: str, field_name: str):
     require_field_hex32(field_name, root)
+
+
+def require_accepted_root(root: str, field_name: str):
+    require_root(root, field_name)
+    assert accepted_roots[root] is True, field_name + " is not accepted!"
 
 
 def require_list_size(values: list, minimum: int, maximum: int, label: str):
@@ -209,6 +209,28 @@ def require_nullifiers(nullifiers: list):
         assert nullifier != FIELD_ZERO_HEX, "Input nullifier must be non-zero!"
 
 
+def require_output_payloads(output_payloads: list, expected_count: int):
+    if output_payloads is None:
+        return [""] * expected_count
+
+    assert isinstance(output_payloads, list), "output_payloads must be a list!"
+    assert len(output_payloads) == expected_count, (
+        "output_payloads length must match output commitments!"
+    )
+
+    normalized = []
+    for payload in output_payloads:
+        if payload is None or payload == "":
+            normalized.append("")
+            continue
+        require_hex_blob("output payload", payload)
+        assert (len(payload) - 2) // 2 <= MAX_OUTPUT_PAYLOAD_BYTES, (
+            "output payload exceeds size limit!"
+        )
+        normalized.append(payload)
+    return normalized
+
+
 def pad_field_values(values: list, size: int):
     padded = []
     for value in values:
@@ -228,6 +250,15 @@ def vk_id_for(action: str):
     return vk_id
 
 
+def pinned_vk_hash_for(action: str):
+    require_action(action)
+    vk_hash = vk_hashes[action]
+    assert isinstance(vk_hash, str) and vk_hash != "", (
+        "Verifying key hash is not configured!"
+    )
+    return vk_hash
+
+
 def assert_supply_invariant():
     assert public_supply.get() + shielded_supply.get() == total_supply.get(), (
         "Supply invariant broken!"
@@ -236,6 +267,45 @@ def assert_supply_invariant():
 
 def require_operator():
     assert ctx.caller == operator.get(), "Only operator!"
+
+
+def current_filled_subtrees():
+    values = []
+    for level in range(SHIELDED_TREE_DEPTH):
+        subtree = filled_subtrees[level]
+        if subtree is None:
+            subtree = FIELD_ZERO_HEX
+        values.append(subtree)
+    return values
+
+
+def append_single_commitment(commitment: str):
+    require_field_hex32("output commitment", commitment)
+    assert commitment != FIELD_ZERO_HEX, "Output commitment must be non-zero!"
+    assert note_exists[commitment] is not True, "Commitment already exists!"
+
+    index = note_count.get()
+    assert index < MAX_NOTE_LEAVES, "Shielded note tree is full!"
+
+    current_hash = commitment
+    current_index = index
+
+    for level in range(SHIELDED_TREE_DEPTH):
+        if current_index % 2 == 0:
+            filled_subtrees[level] = current_hash
+            current_hash = mimc_hash_pair_hex(current_hash, ZERO_HASHES[level])
+        else:
+            left_hash = filled_subtrees[level]
+            if left_hash is None:
+                left_hash = FIELD_ZERO_HEX
+            current_hash = mimc_hash_pair_hex(left_hash, current_hash)
+        current_index = current_index // 2
+
+    note_exists[commitment] = True
+    note_metadata[commitment, "index"] = index
+    note_commitments[index] = commitment
+    note_count.set(index + 1)
+    return current_hash
 
 
 def accept_root(new_root: str):
@@ -252,7 +322,7 @@ def accept_root(new_root: str):
         stale_index = index - window
         stale_root = root_history[stale_index]
         if stale_root is not None:
-            accepted_roots[stale_root] = False
+            accepted_roots[stale_root] = None
             root_history[stale_index] = None
 
     current_root.set(new_root)
@@ -260,34 +330,25 @@ def accept_root(new_root: str):
     RootAccepted({"root": new_root, "index": index})
 
 
-def current_commitment_list():
-    commitments = []
-    for index in range(note_count.get()):
-        commitments.append(note_commitments[index])
-    return commitments
+def append_output_commitments(output_commitments: list, output_payloads: list):
+    if len(output_commitments) == 0:
+        return current_root.get()
 
-
-def projected_root_with_outputs(output_commitments: list):
-    commitments = current_commitment_list()
-    commitments.extend(output_commitments)
-    return merkle_root_from_commitments(commitments)
-
-
-def append_output_commitments(output_commitments: list):
     assert note_count.get() + len(output_commitments) <= MAX_NOTE_LEAVES, (
         "Shielded note tree is full!"
     )
-    new_root = projected_root_with_outputs(output_commitments)
-
+    new_root = current_root.get()
     for commitment in output_commitments:
-        assert note_exists[commitment] is not True, "Commitment already exists!"
-        index = note_count.get()
-        note_exists[commitment] = True
-        note_metadata[commitment, "index"] = index
+        new_root = append_single_commitment(commitment)
+
+    for index in range(len(output_commitments)):
+        commitment = output_commitments[index]
         note_metadata[commitment, "root"] = new_root
         note_metadata[commitment, "created_at"] = now
-        note_commitments[index] = commitment
-        note_count.set(index + 1)
+        payload = output_payloads[index]
+        if payload == "":
+            payload = None
+        note_metadata[commitment, "payload"] = payload
 
     accept_root(new_root)
     return new_root
@@ -302,6 +363,12 @@ def spend_nullifiers(nullifiers: list):
 def verify_proof(action: str, proof_hex: str, public_inputs: list):
     require_hex_blob("proof_hex", proof_hex)
     vk_id = vk_id_for(action)
+    info = zk_registry.get_vk_info(vk_id)
+    assert info is not None, "Configured verifying key is missing!"
+    assert info["active"] is True, "Configured verifying key is inactive!"
+    assert info["vk_hash"] == pinned_vk_hash_for(action), (
+        "Configured verifying key hash changed!"
+    )
     assert zk.verify_groth16(vk_id, proof_hex, public_inputs), (
         "Invalid proof!"
     )
@@ -361,12 +428,14 @@ current_root = Variable()
 balances = Hash(default_value=0)
 approvals = Hash(default_value=0)
 vk_ids = Hash()
+vk_hashes = Hash()
 accepted_roots = Hash(default_value=False)
 root_history = Hash()
 spent_nullifiers = Hash(default_value=False)
 note_exists = Hash(default_value=False)
 note_metadata = Hash()
 note_commitments = Hash()
+filled_subtrees = Hash()
 note_count = Variable()
 metadata = Hash()
 
@@ -516,6 +585,18 @@ def get_vk_id(action: str):
 
 
 @export
+def get_vk_binding(action: str):
+    require_action(action)
+    vk_id = vk_ids[action]
+    if vk_id is None:
+        return None
+    return {
+        "vk_id": vk_id,
+        "vk_hash": vk_hashes[action],
+    }
+
+
+@export
 def current_shielded_root():
     return current_root.get()
 
@@ -534,6 +615,7 @@ def get_proof_config():
         "max_outputs": MAX_OUTPUT_COMMITMENTS,
         "max_note_amount": MAX_NOTE_AMOUNT,
         "zero_root": ZERO_ROOT,
+        "root_history_window": root_history_window.get(),
     }
 
 
@@ -564,7 +646,85 @@ def get_commitment_info(commitment: str):
         "index": note_metadata[commitment, "index"],
         "root": note_metadata[commitment, "root"],
         "created_at": note_metadata[commitment, "created_at"],
+        "payload": note_metadata[commitment, "payload"],
     }
+
+
+@export
+def get_note_payload(commitment: str):
+    require_field_hex32("commitment", commitment)
+    if note_exists[commitment] is not True:
+        return None
+    return note_metadata[commitment, "payload"]
+
+
+@export
+def get_tree_state():
+    return {
+        "root": current_root.get(),
+        "note_count": note_count.get(),
+        "filled_subtrees": current_filled_subtrees(),
+    }
+
+
+@export
+def get_note_count():
+    return note_count.get()
+
+
+@export
+def get_note_commitment(index: int):
+    assert isinstance(index, int), "index must be an integer!"
+    assert 0 <= index < note_count.get(), "index out of range!"
+    return note_commitments[index]
+
+
+@export
+def list_note_commitments(start: int = 0, limit: int = 64):
+    assert isinstance(start, int), "start must be an integer!"
+    assert isinstance(limit, int), "limit must be an integer!"
+    assert start >= 0, "start must be non-negative!"
+    assert 1 <= limit <= MAX_COMMITMENT_PAGE_SIZE, "limit out of range!"
+
+    total = note_count.get()
+    assert start <= total, "start out of range!"
+
+    end = start + limit
+    if end > total:
+        end = total
+
+    commitments = []
+    for index in range(start, end):
+        commitments.append(note_commitments[index])
+    return commitments
+
+
+@export
+def list_note_records(start: int = 0, limit: int = 64):
+    assert isinstance(start, int), "start must be an integer!"
+    assert isinstance(limit, int), "limit must be an integer!"
+    assert start >= 0, "start must be non-negative!"
+    assert 1 <= limit <= MAX_COMMITMENT_PAGE_SIZE, "limit out of range!"
+
+    total = note_count.get()
+    assert start <= total, "start out of range!"
+
+    end = start + limit
+    if end > total:
+        end = total
+
+    records = []
+    for index in range(start, end):
+        commitment = note_commitments[index]
+        records.append(
+            {
+                "index": index,
+                "commitment": commitment,
+                "payload": note_metadata[commitment, "payload"],
+                "created_at": note_metadata[commitment, "created_at"],
+            }
+        )
+    return records
 
 
 @export
@@ -642,7 +802,12 @@ def configure_vk(action: str, vk_id: str):
     require_operator()
     require_action(action)
     assert zk.has_verifying_key(vk_id), "Unknown or inactive verifying key!"
+    info = zk_registry.get_vk_info(vk_id)
+    assert info is not None and info["active"] is True, (
+        "Unknown or inactive verifying key!"
+    )
     vk_ids[action] = vk_id
+    vk_hashes[action] = info["vk_hash"]
     VkConfigured({"action": action, "vk_id": vk_id})
     return vk_id
 
@@ -668,11 +833,14 @@ def deposit_shielded(
     old_root: str,
     output_commitments: list,
     proof_hex: str,
+    output_payloads: list = None,
 ):
     require_shielded_amount(amount)
-    require_root(old_root, "old_root")
+    require_accepted_root(old_root, "old_root")
     require_commitments(output_commitments, 1)
-    assert old_root == current_root.get(), "Old root must equal current root!"
+    output_payloads = require_output_payloads(
+        output_payloads, len(output_commitments)
+    )
     assert balances[ctx.caller] >= amount, "Not enough public balance!"
     assert note_count.get() + len(output_commitments) <= MAX_NOTE_LEAVES, (
         "Shielded note tree is full!"
@@ -688,7 +856,7 @@ def deposit_shielded(
     balances[ctx.caller] -= amount
     public_supply.set(public_supply.get() - amount)
     shielded_supply.set(shielded_supply.get() + amount)
-    new_root = append_output_commitments(output_commitments)
+    new_root = append_output_commitments(output_commitments, output_payloads)
     assert_supply_invariant()
 
     ShieldedDeposit(
@@ -713,11 +881,14 @@ def transfer_shielded(
     input_nullifiers: list,
     output_commitments: list,
     proof_hex: str,
+    output_payloads: list = None,
 ):
-    require_root(old_root, "old_root")
+    require_accepted_root(old_root, "old_root")
     require_nullifiers(input_nullifiers)
     require_commitments(output_commitments, 1)
-    assert old_root == current_root.get(), "Old root must equal current root!"
+    output_payloads = require_output_payloads(
+        output_payloads, len(output_commitments)
+    )
     assert note_count.get() + len(output_commitments) <= MAX_NOTE_LEAVES, (
         "Shielded note tree is full!"
     )
@@ -730,7 +901,7 @@ def transfer_shielded(
     verify_proof("transfer", proof_hex, public_inputs)
 
     spend_nullifiers(input_nullifiers)
-    new_root = append_output_commitments(output_commitments)
+    new_root = append_output_commitments(output_commitments, output_payloads)
     assert_supply_invariant()
 
     ShieldedTransfer(
@@ -758,13 +929,16 @@ def withdraw_shielded(
     input_nullifiers: list,
     output_commitments: list,
     proof_hex: str,
+    output_payloads: list = None,
 ):
     require_shielded_amount(amount)
     assert isinstance(to, str) and to != "", "Recipient must be non-empty!"
-    require_root(old_root, "old_root")
+    require_accepted_root(old_root, "old_root")
     require_nullifiers(input_nullifiers)
-    require_commitments(output_commitments, 1)
-    assert old_root == current_root.get(), "Old root must equal current root!"
+    require_commitments(output_commitments, 0)
+    output_payloads = require_output_payloads(
+        output_payloads, len(output_commitments)
+    )
     assert note_count.get() + len(output_commitments) <= MAX_NOTE_LEAVES, (
         "Shielded note tree is full!"
     )
@@ -782,7 +956,7 @@ def withdraw_shielded(
     balances[to] += amount
     public_supply.set(public_supply.get() + amount)
     shielded_supply.set(shielded_supply.get() - amount)
-    new_root = append_output_commitments(output_commitments)
+    new_root = append_output_commitments(output_commitments, output_payloads)
     assert_supply_invariant()
 
     ShieldedWithdraw(
