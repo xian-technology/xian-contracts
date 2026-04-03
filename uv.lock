@@ -387,7 +387,36 @@ wheels = [
 ]
 
 [[package]]
-name = "xian-accounts"
+name = "xian-contracts-hub"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "xian-tech-accounts" },
+    { name = "xian-tech-contracting", extra = ["zk"] },
+    { name = "xian-tech-linter" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+    { name = "ruff" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "xian-tech-accounts", editable = "../xian-contracting/packages/xian-accounts" },
+    { name = "xian-tech-contracting", extras = ["zk"], editable = "../xian-contracting" },
+    { name = "xian-tech-linter", editable = "../xian-linter" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest", specifier = ">=9.0.2,<10" },
+    { name = "ruff", specifier = ">=0.15.6,<0.16" },
+]
+
+[[package]]
+name = "xian-tech-accounts"
 version = "0.1.0"
 source = { editable = "../xian-contracting/packages/xian-accounts" }
 dependencies = [
@@ -398,7 +427,7 @@ dependencies = [
 requires-dist = [{ name = "pynacl", specifier = ">=1.5.0,<2" }]
 
 [[package]]
-name = "xian-contracting"
+name = "xian-tech-contracting"
 version = "1.0.1"
 source = { editable = "../xian-contracting" }
 dependencies = [
@@ -406,23 +435,23 @@ dependencies = [
     { name = "cachetools" },
     { name = "lmdb" },
     { name = "pynacl" },
-    { name = "xian-runtime-types" },
+    { name = "xian-tech-runtime-types" },
 ]
 
 [package.optional-dependencies]
 zk = [
-    { name = "xian-zk" },
+    { name = "xian-tech-zk" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "autopep8", specifier = ">=1.5.7,<2" },
     { name = "cachetools", specifier = ">=5,<8" },
-    { name = "lmdb", specifier = ">=1.6,<2" },
+    { name = "lmdb", specifier = ">=1.6,<3" },
     { name = "pynacl", specifier = ">=1.5.0,<2" },
-    { name = "xian-native-tracer", marker = "extra == 'native'", editable = "../xian-contracting/packages/xian-native-tracer" },
-    { name = "xian-runtime-types", editable = "../xian-contracting/packages/xian-runtime-types" },
-    { name = "xian-zk", marker = "extra == 'zk'", editable = "../xian-contracting/packages/xian-zk" },
+    { name = "xian-tech-native-tracer", marker = "extra == 'native'", editable = "../xian-contracting/packages/xian-native-tracer" },
+    { name = "xian-tech-runtime-types", editable = "../xian-contracting/packages/xian-runtime-types" },
+    { name = "xian-tech-zk", marker = "extra == 'zk'", editable = "../xian-contracting/packages/xian-zk" },
 ]
 provides-extras = ["native", "zk"]
 
@@ -434,42 +463,13 @@ dev = [
 ]
 
 [[package]]
-name = "xian-contracts-hub"
-version = "0.1.0"
-source = { virtual = "." }
-dependencies = [
-    { name = "xian-accounts" },
-    { name = "xian-contracting", extra = ["zk"] },
-    { name = "xian-linter" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "pytest" },
-    { name = "ruff" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "xian-accounts", editable = "../xian-contracting/packages/xian-accounts" },
-    { name = "xian-contracting", extras = ["zk"], editable = "../xian-contracting" },
-    { name = "xian-linter", editable = "../xian-linter" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "pytest", specifier = ">=9.0.2,<10" },
-    { name = "ruff", specifier = ">=0.15.6,<0.16" },
-]
-
-[[package]]
-name = "xian-linter"
-version = "0.3.0"
+name = "xian-tech-linter"
+version = "0.3.1"
 source = { editable = "../xian-linter" }
 dependencies = [
     { name = "pydantic" },
     { name = "pyflakes" },
-    { name = "xian-contracting" },
+    { name = "xian-tech-contracting" },
 ]
 
 [package.metadata]
@@ -478,7 +478,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2,<3" },
     { name = "pyflakes", specifier = ">=3.2,<4" },
     { name = "uvicorn", marker = "extra == 'server'", specifier = ">=0.34,<1" },
-    { name = "xian-contracting", editable = "../xian-contracting" },
+    { name = "xian-tech-contracting", editable = "../xian-contracting" },
 ]
 provides-extras = ["server"]
 
@@ -489,13 +489,13 @@ dev = [
 ]
 
 [[package]]
-name = "xian-runtime-types"
+name = "xian-tech-runtime-types"
 version = "0.1.0"
 source = { editable = "../xian-contracting/packages/xian-runtime-types" }
 
 [[package]]
-name = "xian-zk"
-version = "0.1.0"
+name = "xian-tech-zk"
+version = "0.1.1"
 source = { editable = "../xian-contracting/packages/xian-zk" }
 dependencies = [
     { name = "pynacl" },

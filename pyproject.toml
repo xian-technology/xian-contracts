@@ -5,9 +5,9 @@ description = "Curated contract hub for Xian"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "xian-accounts>=0.1.0,<1",
-    "xian-contracting[zk]>=1.0.1,<2",
-    "xian-linter>=0.3.0,<1",
+    "xian-tech-accounts>=0.1.0,<1",
+    "xian-tech-contracting[zk]>=1.0.1,<2",
+    "xian-tech-linter>=0.3.0,<1",
 ]
 
 [dependency-groups]
@@ -17,9 +17,9 @@ dev = [
 ]
 
 [tool.uv.sources]
-xian-accounts = { path = "../xian-contracting/packages/xian-accounts", editable = true }
-xian-contracting = { path = "../xian-contracting", editable = true }
-xian-linter = { path = "../xian-linter", editable = true }
+xian-tech-accounts = { path = "../xian-contracting/packages/xian-accounts", editable = true }
+xian-tech-contracting = { path = "../xian-contracting", editable = true }
+xian-tech-linter = { path = "../xian-linter", editable = true }
 
 [tool.pytest.ini_options]
 testpaths = ["contracts"]

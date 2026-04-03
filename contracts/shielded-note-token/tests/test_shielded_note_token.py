@@ -28,9 +28,9 @@ WORKSPACE_ROOT = Path(__file__).resolve().parents[4]
 ZK_REGISTRY_PATH = (
     WORKSPACE_ROOT
     / "xian-contracting"
-    / "src"
-    / "contracting"
-    / "contracts"
+    / "tests"
+    / "integration"
+    / "test_contracts"
     / "zk_registry.s.py"
 )
 
