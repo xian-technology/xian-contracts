@@ -428,7 +428,7 @@ requires-dist = [{ name = "pynacl", specifier = ">=1.5.0,<2" }]
 
 [[package]]
 name = "xian-tech-contracting"
-version = "1.0.1"
+version = "1.0.2"
 source = { editable = "../xian-contracting" }
 dependencies = [
     { name = "autopep8" },
@@ -464,7 +464,7 @@ dev = [
 
 [[package]]
 name = "xian-tech-linter"
-version = "0.3.1"
+version = "0.3.2"
 source = { editable = "../xian-linter" }
 dependencies = [
     { name = "pydantic" },

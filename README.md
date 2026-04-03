@@ -32,11 +32,16 @@ uv run pytest -m slow
 | `contracts/staking` | curated | Multi-pool staking contract with reward deposits and emergency controls |
 | `contracts/xsc001` | curated | Token interface checker contract |
 | `contracts/dex` | candidate | Multi-contract DEX package with pairs, router, and helper contracts |
+| `contracts/profile-registry` | candidate | Social profile and channel registry scaffold with username resolution |
+| `contracts/scheduled-actions` | candidate | Allowlisted delayed-call scheduler with cancellation and execution controls |
 | `contracts/stream-payments` | candidate | Standalone escrowed token-stream contract extracted from legacy XSC003-style logic |
 | `contracts/shielded-note-token` | candidate | Root/nullifier/note-based shielded token contract with registry-backed zk verification ids |
 | `contracts/reflection-token` | candidate | Reflection token designed to integrate with the Xian DEX |
 | `contracts/privacy-token` | experimental | Commitment-based token experiment without zero-knowledge proofs |
 | `contracts/lottery` | experimental | Simple lottery pattern using deterministic public randomness |
+| `contracts/shielded-commands` | experimental | Commit/reveal private-command coordinator intended for shielded-note integration |
+| `contracts/turn-based-games` | experimental | Generic match registry for turn-based games and off-chain move/state refs |
+| `contracts/weighted-lottery` | experimental | Ticket-weighted lottery example with configurable token pricing |
 
 ## Key Directories
 

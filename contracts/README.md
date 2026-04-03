@@ -21,9 +21,14 @@ This folder contains the curated contract packages in `xian-contracts`.
 - `dex/`: router, pair factory, and helper contracts
 - `lottery/`: simple lottery example
 - `nameservice/`: renewable name registry
+- `profile-registry/`: social profile and channel registry scaffold
 - `privacy-token/`: commitment-based privacy token experiment
+- `scheduled-actions/`: allowlisted delayed-call scheduler
+- `shielded-commands/`: commit/reveal private-command coordinator scaffold
 - `shielded-note-token/`: root/nullifier/note-based shielded token contract
 - `reflection-token/`: fee-on-transfer reflection token
 - `stream-payments/`: standalone escrowed token streaming contract
 - `staking/`: multi-pool staking system
+- `turn-based-games/`: generic turn-based match registry
+- `weighted-lottery/`: ticket-weighted lottery example
 - `xsc001/`: token interface checker
