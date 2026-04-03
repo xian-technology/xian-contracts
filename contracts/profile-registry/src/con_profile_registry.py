@@ -4,6 +4,13 @@ profiles = Hash(default_value=None)
 channels = Hash(default_value=None)
 channel_members = Hash(default_value=False)
 
+MAX_USERNAME_LENGTH = 32
+MAX_CHANNEL_LENGTH = 64
+MAX_DISPLAY_NAME_LENGTH = 64
+MAX_METADATA_URI_LENGTH = 256
+MAX_ENCRYPTION_KEY_LENGTH = 256
+MAX_CUSTOM_FIELD_VALUE_LENGTH = 256
+
 RESERVED_PROFILE_FIELDS = [
     "username",
     "display_name",
@@ -52,6 +59,10 @@ def seed(name: str = "Profile Registry", operator: str = None):
     metadata["operator"] = operator
 
 
+def require_operator():
+    assert ctx.caller == metadata["operator"], "Only operator can update operator."
+
+
 def validate_identifier(value: str, label: str, max_length: int):
     assert isinstance(value, str) and value != "", label + " must be non-empty."
     assert len(value) <= max_length, label + " is too long."
@@ -62,14 +73,32 @@ def validate_identifier(value: str, label: str, max_length: int):
     )
 
 
+def canonicalize_identifier(value: str, label: str, max_length: int):
+    assert isinstance(value, str), label + " must be a string."
+    normalized = value.lower()
+    validate_identifier(normalized, label, max_length)
+    return normalized
+
+
 def require_profile(account: str):
     assert profiles[account, "username"] is not None, "Profile does not exist."
     return account
 
 
+def require_channel(channel_name: str):
+    normalized = canonicalize_identifier(
+        channel_name,
+        "channel_name",
+        MAX_CHANNEL_LENGTH,
+    )
+    owner = channels[normalized, "owner"]
+    assert owner is not None, "Channel does not exist."
+    return normalized
+
+
 def resolve_account_or_username(value: str):
     assert isinstance(value, str) and value != "", "Account value must be non-empty."
-    resolved = usernames[value]
+    resolved = usernames[value.lower()]
     if resolved is not None:
         return resolved
     return value
@@ -83,22 +112,30 @@ def ensure_known_profile(value: str):
 
 def store_username(account: str, username: str):
     previous = profiles[account, "username"]
-    if previous == username:
-        return username
-    validate_identifier(username, "username", 32)
-    existing = usernames[username]
+    normalized = canonicalize_identifier(
+        username,
+        "username",
+        MAX_USERNAME_LENGTH,
+    )
+    if previous == normalized:
+        return normalized
+
+    existing = usernames[normalized]
     assert existing is None or existing == account, "Username is already taken."
+
     if previous is not None:
         usernames[previous] = None
-    usernames[username] = account
-    profiles[account, "username"] = username
-    return username
+
+    usernames[normalized] = account
+    profiles[account, "username"] = normalized
+    return normalized
 
 
-def normalize_text(value: str):
+def normalize_text(value: str, label: str = "value", max_length: int = 256):
     if value is None:
         return ""
-    assert isinstance(value, str), "Expected string value."
+    assert isinstance(value, str), label + " must be a string."
+    assert len(value) <= max_length, label + " is too long."
     return value
 
 
@@ -121,6 +158,30 @@ def build_member_list(owner: str, members: list):
     return normalized
 
 
+def store_channel_members(channel_name: str, member_list: list):
+    existing = channels[channel_name, "members"] or []
+    for member in existing:
+        if member not in member_list:
+            channel_members[channel_name, member] = False
+    for member in member_list:
+        channel_members[channel_name, member] = True
+    channels[channel_name, "members"] = member_list
+
+
+def require_channel_owner(channel_name: str):
+    normalized = require_channel(channel_name)
+    assert channels[normalized, "owner"] == ctx.caller, "Only channel owner can update."
+    return normalized
+
+
+@export
+def set_operator(operator: str):
+    require_operator()
+    assert isinstance(operator, str) and operator != "", "operator must be non-empty."
+    metadata["operator"] = operator
+    return operator
+
+
 @export
 def register_profile(
     username: str,
@@ -130,14 +191,30 @@ def register_profile(
 ):
     account = ctx.caller
     assert profiles[account, "username"] is None, "Profile already exists."
-    store_username(account, username)
-    profiles[account, "display_name"] = normalize_text(display_name) or username
-    profiles[account, "metadata_uri"] = normalize_text(metadata_uri)
-    profiles[account, "encryption_key"] = normalize_text(encryption_key)
+
+    stored_username = store_username(account, username)
+    normalized_display_name = normalize_text(
+        display_name,
+        label="display_name",
+        max_length=MAX_DISPLAY_NAME_LENGTH,
+    )
+
+    profiles[account, "display_name"] = normalized_display_name or stored_username
+    profiles[account, "metadata_uri"] = normalize_text(
+        metadata_uri,
+        label="metadata_uri",
+        max_length=MAX_METADATA_URI_LENGTH,
+    )
+    profiles[account, "encryption_key"] = normalize_text(
+        encryption_key,
+        label="encryption_key",
+        max_length=MAX_ENCRYPTION_KEY_LENGTH,
+    )
     profiles[account, "custom_keys"] = []
     profiles[account, "created_at"] = now
     profiles[account, "updated_at"] = now
-    ProfileRegisteredEvent({"account": account, "username": username})
+
+    ProfileRegisteredEvent({"account": account, "username": stored_username})
     return get_profile(account=account)
 
 
@@ -150,14 +227,31 @@ def update_profile(
 ):
     account = ctx.caller
     require_profile(account)
+
     if username is not None:
         store_username(account, username)
     if display_name is not None:
-        profiles[account, "display_name"] = normalize_text(display_name)
+        normalized_display_name = normalize_text(
+            display_name,
+            label="display_name",
+            max_length=MAX_DISPLAY_NAME_LENGTH,
+        )
+        profiles[account, "display_name"] = (
+            normalized_display_name or profiles[account, "username"]
+        )
     if metadata_uri is not None:
-        profiles[account, "metadata_uri"] = normalize_text(metadata_uri)
+        profiles[account, "metadata_uri"] = normalize_text(
+            metadata_uri,
+            label="metadata_uri",
+            max_length=MAX_METADATA_URI_LENGTH,
+        )
     if encryption_key is not None:
-        profiles[account, "encryption_key"] = normalize_text(encryption_key)
+        profiles[account, "encryption_key"] = normalize_text(
+            encryption_key,
+            label="encryption_key",
+            max_length=MAX_ENCRYPTION_KEY_LENGTH,
+        )
+
     profiles[account, "updated_at"] = now
     ProfileUpdatedEvent(
         {"account": account, "username": profiles[account, "username"]}
@@ -169,15 +263,38 @@ def update_profile(
 def set_profile_field(key: str, value: str):
     account = ctx.caller
     require_profile(account)
+
     validate_identifier(key, "field key", 64)
     assert key not in RESERVED_PROFILE_FIELDS, "Reserved profile field."
+
     custom_keys = custom_keys_for(account)
     if key not in custom_keys:
         custom_keys.append(key)
         profiles[account, "custom_keys"] = custom_keys
-    profiles[account, "custom", key] = normalize_text(value)
+
+    profiles[account, "custom", key] = normalize_text(
+        value,
+        label="field value",
+        max_length=MAX_CUSTOM_FIELD_VALUE_LENGTH,
+    )
     profiles[account, "updated_at"] = now
     return profiles[account, "custom", key]
+
+
+@export
+def clear_profile_field(key: str):
+    account = ctx.caller
+    require_profile(account)
+
+    validate_identifier(key, "field key", 64)
+    custom_keys = custom_keys_for(account)
+    assert key in custom_keys, "Profile field does not exist."
+
+    custom_keys.remove(key)
+    profiles[account, "custom_keys"] = custom_keys
+    profiles[account, "custom", key] = None
+    profiles[account, "updated_at"] = now
+    return key
 
 
 @export
@@ -189,21 +306,34 @@ def create_channel(
 ):
     owner = ctx.caller
     require_profile(owner)
-    validate_identifier(channel_name, "channel_name", 64)
-    assert channels[channel_name, "owner"] is None, "Channel already exists."
+
+    normalized_channel_name = canonicalize_identifier(
+        channel_name,
+        "channel_name",
+        MAX_CHANNEL_LENGTH,
+    )
+    assert channels[normalized_channel_name, "owner"] is None, "Channel already exists."
 
     member_list = build_member_list(owner, members)
-    channels[channel_name, "owner"] = owner
-    channels[channel_name, "metadata_uri"] = normalize_text(metadata_uri)
-    channels[channel_name, "encryption_mode"] = normalize_text(encryption_mode)
-    channels[channel_name, "members"] = member_list
-    channels[channel_name, "created_at"] = now
-    channels[channel_name, "updated_at"] = now
-    for member in member_list:
-        channel_members[channel_name, member] = True
+    channels[normalized_channel_name, "owner"] = owner
+    channels[normalized_channel_name, "metadata_uri"] = normalize_text(
+        metadata_uri,
+        label="metadata_uri",
+        max_length=MAX_METADATA_URI_LENGTH,
+    )
+    channels[normalized_channel_name, "encryption_mode"] = normalize_text(
+        encryption_mode,
+        label="encryption_mode",
+        max_length=MAX_DISPLAY_NAME_LENGTH,
+    )
+    channels[normalized_channel_name, "created_at"] = now
+    channels[normalized_channel_name, "updated_at"] = now
+    store_channel_members(normalized_channel_name, member_list)
 
-    ChannelCreatedEvent({"channel_name": channel_name, "owner": owner})
-    return get_channel(channel_name=channel_name)
+    ChannelCreatedEvent(
+        {"channel_name": normalized_channel_name, "owner": owner}
+    )
+    return get_channel(channel_name=normalized_channel_name)
 
 
 @export
@@ -213,41 +343,107 @@ def update_channel(
     metadata_uri: str = None,
     encryption_mode: str = None,
 ):
-    owner = ctx.caller
-    assert channels[channel_name, "owner"] == owner, "Only channel owner can update."
+    normalized_channel_name = require_channel_owner(channel_name)
 
     if members is not None:
-        existing = channels[channel_name, "members"] or []
-        updated_members = build_member_list(owner, members)
-        for member in existing:
-            if member not in updated_members:
-                channel_members[channel_name, member] = False
-        for member in updated_members:
-            channel_members[channel_name, member] = True
-        channels[channel_name, "members"] = updated_members
+        updated_members = build_member_list(ctx.caller, members)
+        store_channel_members(normalized_channel_name, updated_members)
     if metadata_uri is not None:
-        channels[channel_name, "metadata_uri"] = normalize_text(metadata_uri)
+        channels[normalized_channel_name, "metadata_uri"] = normalize_text(
+            metadata_uri,
+            label="metadata_uri",
+            max_length=MAX_METADATA_URI_LENGTH,
+        )
     if encryption_mode is not None:
-        channels[channel_name, "encryption_mode"] = normalize_text(encryption_mode)
-    channels[channel_name, "updated_at"] = now
+        channels[normalized_channel_name, "encryption_mode"] = normalize_text(
+            encryption_mode,
+            label="encryption_mode",
+            max_length=MAX_DISPLAY_NAME_LENGTH,
+        )
 
-    ChannelUpdatedEvent({"channel_name": channel_name, "owner": owner})
-    return get_channel(channel_name=channel_name)
+    channels[normalized_channel_name, "updated_at"] = now
+    ChannelUpdatedEvent(
+        {"channel_name": normalized_channel_name, "owner": ctx.caller}
+    )
+    return get_channel(channel_name=normalized_channel_name)
+
+
+@export
+def add_channel_members(channel_name: str, members: list):
+    normalized_channel_name = require_channel_owner(channel_name)
+    existing = channels[normalized_channel_name, "members"] or []
+    updated = build_member_list(ctx.caller, existing + (members or []))
+    store_channel_members(normalized_channel_name, updated)
+    channels[normalized_channel_name, "updated_at"] = now
+    ChannelUpdatedEvent(
+        {"channel_name": normalized_channel_name, "owner": ctx.caller}
+    )
+    return get_channel(channel_name=normalized_channel_name)
+
+
+@export
+def remove_channel_members(channel_name: str, members: list):
+    normalized_channel_name = require_channel_owner(channel_name)
+    assert isinstance(members, list), "members must be a list."
+
+    blocked = []
+    for member in members:
+        resolved = ensure_known_profile(member)
+        if resolved not in blocked:
+            blocked.append(resolved)
+
+    updated = [ctx.caller]
+    for member in channels[normalized_channel_name, "members"] or []:
+        if member != ctx.caller and member not in blocked and member not in updated:
+            updated.append(member)
+
+    store_channel_members(normalized_channel_name, updated)
+    channels[normalized_channel_name, "updated_at"] = now
+    ChannelUpdatedEvent(
+        {"channel_name": normalized_channel_name, "owner": ctx.caller}
+    )
+    return get_channel(channel_name=normalized_channel_name)
+
+
+@export
+def delete_channel(channel_name: str):
+    normalized_channel_name = require_channel_owner(channel_name)
+    existing = channels[normalized_channel_name, "members"] or []
+    for member in existing:
+        channel_members[normalized_channel_name, member] = False
+
+    channels[normalized_channel_name, "owner"] = None
+    channels[normalized_channel_name, "metadata_uri"] = None
+    channels[normalized_channel_name, "encryption_mode"] = None
+    channels[normalized_channel_name, "members"] = []
+    channels[normalized_channel_name, "deleted_at"] = now
+    channels[normalized_channel_name, "updated_at"] = now
+    return normalized_channel_name
 
 
 @export
 def resolve_username(username: str):
-    return usernames[username]
+    normalized = canonicalize_identifier(
+        username,
+        "username",
+        MAX_USERNAME_LENGTH,
+    )
+    return usernames[normalized]
 
 
 @export
 def get_profile(account: str = None):
     if account is None or account == "":
         account = ctx.caller
+    else:
+        account = resolve_account_or_username(account)
+
     require_profile(account)
+
     custom = {}
     for key in custom_keys_for(account):
         custom[key] = profiles[account, "custom", key]
+
     return {
         "account": account,
         "username": profiles[account, "username"],
@@ -262,19 +458,20 @@ def get_profile(account: str = None):
 
 @export
 def get_channel(channel_name: str):
-    owner = channels[channel_name, "owner"]
-    assert owner is not None, "Channel does not exist."
+    normalized_channel_name = require_channel(channel_name)
+    owner = channels[normalized_channel_name, "owner"]
     return {
-        "channel_name": channel_name,
+        "channel_name": normalized_channel_name,
         "owner": owner,
-        "metadata_uri": channels[channel_name, "metadata_uri"],
-        "encryption_mode": channels[channel_name, "encryption_mode"],
-        "members": channels[channel_name, "members"] or [],
-        "created_at": str(channels[channel_name, "created_at"]),
-        "updated_at": str(channels[channel_name, "updated_at"]),
+        "metadata_uri": channels[normalized_channel_name, "metadata_uri"],
+        "encryption_mode": channels[normalized_channel_name, "encryption_mode"],
+        "members": channels[normalized_channel_name, "members"] or [],
+        "created_at": str(channels[normalized_channel_name, "created_at"]),
+        "updated_at": str(channels[normalized_channel_name, "updated_at"]),
     }
 
 
 @export
 def is_channel_member(channel_name: str, account: str):
-    return channel_members[channel_name, ensure_known_profile(account)]
+    normalized_channel_name = require_channel(channel_name)
+    return channel_members[normalized_channel_name, ensure_known_profile(account)]

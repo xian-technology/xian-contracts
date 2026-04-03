@@ -19,6 +19,9 @@ coordination.
 - It captures the reusable part of the Gamma Phi idea: a shared match manager
   with explicit participants, turn order, move references, and accepted
   results.
+- The current scaffold also covers invited-opponent decline, participant
+  resignation, and per-move reads so clients do not need to reconstruct those
+  flows off-chain.
 - Game-specific validation can later be layered on top by app logic or by
   tighter package variants.
 - Move payloads are stored as references or compact strings, not full rich game
@@ -27,4 +30,4 @@ coordination.
 ## Validation
 
 - repo-wide lint and compile checks
-- no package-local automated tests yet
+- package-local automated tests for move storage and lifecycle transitions

@@ -20,6 +20,8 @@ shielded-note token stack.
   allowlisting, relayer policy, and explicit execution replay.
 - Executed commands target a fixed exported `interact(payload: dict)`
   entrypoint so the scaffold stays compatible with Xian contract constraints.
+- Active command hashes are deduplicated, executed hashes become non-replayable,
+  and expirable commands can be marked stale instead of lingering forever.
 - The intended next step is proof-gated integration with
   `contracts/shielded-note-token/` and `zk_registry`.
 - Until that lands, treat this package as architecture scaffolding rather than
@@ -28,4 +30,4 @@ shielded-note token stack.
 ## Validation
 
 - repo-wide lint and compile checks
-- no package-local automated tests yet
+- package-local automated tests for relayed execution and expiry/replay guards

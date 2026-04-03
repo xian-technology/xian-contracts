@@ -17,14 +17,19 @@ profile fields, and owner-managed group channels.
 - This is intentionally separate from the nameservice contract. Nameservice is
   ownership-oriented and transferable; this package is account-profile
   oriented.
-- Usernames are unique, mutable, and cleaned up correctly when renamed.
+- Usernames and channel names are canonicalized case-insensitively and cleaned
+  up correctly when renamed.
 - Channels are lightweight group registries. They do not store message bodies
   or end-to-end encryption state; callers can reference off-chain metadata and
   key material instead.
+- The current scaffold includes custom-field cleanup plus incremental channel
+  member add/remove and delete flows, which makes it easier to build app-layer
+  clients without replacing whole member lists on every change.
 - The package is a starting point for social/app-layer identity, not a
   production-hardened identity standard.
 
 ## Validation
 
 - repo-wide lint and compile checks
-- no package-local automated tests yet
+- package-local automated tests for username normalization and channel
+  lifecycle helpers

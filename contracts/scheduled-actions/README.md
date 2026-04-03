@@ -19,6 +19,9 @@ without embedding bespoke queue logic.
 - Target contracts must be explicitly allowlisted by the operator.
 - Scheduled targets are invoked through a fixed exported
   `interact(payload: dict)` entrypoint instead of arbitrary function dispatch.
+- Scheduled actions can be rescheduled, expired explicitly, and are marked
+  `executing` before cross-contract calls to avoid simple replay/reentrancy
+  races.
 - This is intentionally narrower than a cron system. It is a reusable delayed
   execution primitive, not a full automation framework.
 - The contract stores payloads on-chain and replays them at execution
@@ -27,4 +30,4 @@ without embedding bespoke queue logic.
 ## Validation
 
 - repo-wide lint and compile checks
-- no package-local automated tests yet
+- package-local automated tests for due execution and expiry handling
