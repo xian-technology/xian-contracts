@@ -8,13 +8,54 @@ CONTRACT_PATH = ROOT / "src" / "con_xsc001.py"
 
 VALID_TOKEN = """
 balances = Hash(default_value=0)
+approvals = Hash(default_value=0)
 metadata = Hash()
+operator = Variable()
 
 @construct
 def seed():
     balances[ctx.caller] = 1000
     metadata['token_name'] = 'Valid Token'
     metadata['token_symbol'] = 'VT'
+    metadata['token_logo_url'] = ''
+    metadata['token_website'] = ''
+    metadata['total_supply'] = balances[ctx.caller]
+    operator.set(ctx.caller)
+
+@export
+def change_metadata(key: str, value: Any):
+    assert ctx.caller == operator.get(), 'Only operator can set metadata!'
+    metadata[key] = value
+
+@export
+def transfer(amount: float, to: str):
+    balances[ctx.caller] -= amount
+    balances[to] += amount
+
+@export
+def approve(amount: float, to: str):
+    approvals[ctx.caller, to] = amount
+
+@export
+def transfer_from(amount: float, to: str, main_account: str):
+    approvals[main_account, ctx.caller] -= amount
+    balances[main_account] -= amount
+    balances[to] += amount
+
+@export
+def balance_of(address: str):
+    return balances[address]
+"""
+
+INVALID_TOKEN = """
+balances = Hash(default_value=0)
+metadata = Hash()
+
+@construct
+def seed():
+    balances[ctx.caller] = 1000
+    metadata['token_name'] = 'Legacy Token'
+    metadata['token_symbol'] = 'LT'
     metadata['token_logo_url'] = ''
     metadata['token_website'] = ''
     metadata['operator'] = ctx.caller
@@ -34,28 +75,13 @@ def approve(amount: float, to: str):
 
 @export
 def transfer_from(amount: float, to: str, main_account: str):
+    balances[main_account, ctx.caller] -= amount
     balances[main_account] -= amount
     balances[to] += amount
 
 @export
 def balance_of(account: str):
     return balances[account]
-"""
-
-INVALID_TOKEN = """
-balances = Hash(default_value=0)
-metadata = Hash()
-
-@construct
-def seed():
-    balances[ctx.caller] = 1000
-    metadata['token_name'] = 'Broken Token'
-    metadata['token_symbol'] = 'BT'
-
-@export
-def transfer(amount: float, to: str):
-    balances[ctx.caller] -= amount
-    balances[to] += amount
 """
 
 
