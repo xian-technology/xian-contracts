@@ -1,11 +1,87 @@
 import unittest
 from pathlib import Path
 
+import pytest
 from contracting.client import ContractingClient
 from xian_runtime_types.time import Datetime
 
+pytest.importorskip("xian_zk")
+from xian_zk import (
+    ShieldedCommandProver,
+    ShieldedCommandRequest,
+    ShieldedDepositRequest,
+    ShieldedKeyBundle,
+    ShieldedNote,
+    ShieldedWithdrawRequest,
+    scan_notes,
+    tree_state,
+)
+
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACT_PATH = ROOT / "src" / "con_shielded_commands.py"
+WORKSPACE_ROOT = Path(__file__).resolve().parents[4]
+ZK_REGISTRY_PATH = (
+    WORKSPACE_ROOT
+    / "xian-contracting"
+    / "tests"
+    / "integration"
+    / "test_contracts"
+    / "zk_registry.s.py"
+)
+
+TOKEN_CODE = """
+balances = Hash(default_value=0)
+approvals = Hash(default_value=0)
+metadata = Hash()
+
+
+@construct
+def seed():
+    metadata["token_name"] = "Fee Token"
+    metadata["token_symbol"] = "FEE"
+    metadata["token_logo_url"] = ""
+    metadata["token_website"] = ""
+
+
+@export
+def change_metadata(key: str, value: str):
+    metadata[key] = value
+
+
+@export
+def balance_of(address: str):
+    return balances[address]
+
+
+@export
+def mint(amount: int, to: str):
+    balances[to] += amount
+    return amount
+
+
+@export
+def approve(amount: int, to: str):
+    approvals[ctx.caller, to] = amount
+    return amount
+
+
+@export
+def transfer(amount: int, to: str):
+    assert balances[ctx.caller] >= amount, "insufficient balance"
+    balances[ctx.caller] -= amount
+    balances[to] += amount
+    return amount
+
+
+@export
+def transfer_from(amount: int, to: str, main_account: str):
+    assert approvals[main_account, ctx.caller] >= amount, "insufficient allowance"
+    assert balances[main_account] >= amount, "insufficient balance"
+    approvals[main_account, ctx.caller] -= amount
+    balances[main_account] -= amount
+    balances[to] += amount
+    return amount
+"""
 
 TARGET_CODE = """
 counter = Variable()
@@ -34,18 +110,61 @@ def info():
 
 
 class TestShieldedCommands(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.prover = ShieldedCommandProver.build_insecure_dev_bundle()
+        cls.registry_manifest = cls.prover.registry_manifest()
+
     def setUp(self):
         self.client = ContractingClient()
         self.client.flush()
 
-        self.client.submit(TARGET_CODE, name="con_shielded_target")
-        with CONTRACT_PATH.open() as f:
-            self.client.submit(f.read(), name="con_shielded_commands")
+        with ZK_REGISTRY_PATH.open() as registry_file:
+            self.client.raw_driver.set_contract_from_source(
+                name="zk_registry",
+                source=registry_file.read(),
+                lint=False,
+            )
+        self.client.raw_driver.commit()
 
-        self.commands = self.client.get_contract("con_shielded_commands")
+        self.registry = self.client.get_contract("zk_registry")
+        self.registry.seed(owner="sys", signer="sys")
+        for entry in self.registry_manifest["registry_entries"]:
+            self.registry.register_vk(
+                vk_id=entry["vk_id"],
+                vk_hex=entry["vk_hex"],
+                circuit_name=entry["circuit_name"],
+                version=entry["version"],
+                signer="sys",
+            )
+
+        self.client.submit(TOKEN_CODE, name="con_fee_token")
+        self.client.submit(TARGET_CODE, name="con_shielded_target")
+        with CONTRACT_PATH.open() as contract_file:
+            self.client.submit(
+                contract_file.read(),
+                name="con_shielded_commands",
+                constructor_args={
+                    "token_contract": "con_fee_token",
+                    "root_window_size": 3,
+                },
+            )
+
+        self.token = self.client.get_contract("con_fee_token")
         self.target = self.client.get_contract("con_shielded_target")
-        self.alice = "a" * 64
-        self.relayer = "r" * 64
+        self.commands = self.client.get_contract("con_shielded_commands")
+        for binding in self.registry_manifest["configure_actions"]:
+            self.commands.configure_vk(
+                action=binding["action"],
+                vk_id=binding["vk_id"],
+                signer="sys",
+            )
+
+        self.alice = "alice"
+        self.bob = "bob"
+        self.relayer = "relayer"
+        self.alt_relayer = "relayer-two"
+        self.chain_id = "xian-local-1"
         self.start = Datetime(2026, 1, 1, 12, 0, 0)
 
         self.commands.set_target_allowed(
@@ -53,86 +172,381 @@ class TestShieldedCommands(unittest.TestCase):
             enabled=True,
             signer="sys",
         )
+        self.commands.set_relayer(account=self.relayer, enabled=True, signer="sys")
         self.commands.set_relayer(
-            account=self.relayer,
+            account=self.alt_relayer,
             enabled=True,
             signer="sys",
         )
         self.commands.set_relayer_restriction(enabled=True, signer="sys")
 
+        self.token.mint(amount=100, to=self.alice, signer="sys")
+        self.token.approve(
+            amount=100,
+            to="con_shielded_commands",
+            signer=self.alice,
+        )
+
+        self.alice_keys = ShieldedKeyBundle.from_parts(
+            owner_secret="0x" + format(101, "064x"),
+            viewing_private_key="11" * 32,
+        )
+        self.asset_id = self.commands.asset_id(signer="sys")
+
     def tearDown(self):
         self.client.flush()
 
-    def test_command_executes_once_via_authorized_relayer(self):
-        payload = {"increment": 4, "label": "hidden"}
-        command_hash = self.commands.hash_command(
-            target_contract="con_shielded_target",
-            payload=payload,
-            nonce="nonce-1",
+    def _environment(self, when: Datetime):
+        return {"now": when, "chain_id": self.chain_id}
+
+    def _all_commitments(self):
+        note_count = self.commands.get_note_count(signer="sys")
+        if note_count == 0:
+            return []
+        return self.commands.list_note_commitments(
+            start=0,
+            limit=note_count,
+            signer="sys",
         )
 
-        command_id = self.commands.commit_command(
-            command_hash=command_hash,
-            expires_at=Datetime(2026, 1, 1, 12, 10, 0),
+    def _deposit_note(self, note: ShieldedNote, *, signer: str, payloads=None):
+        commitments_before = self._all_commitments()
+        request = ShieldedDepositRequest(
+            asset_id=self.asset_id,
+            old_root=self.commands.current_shielded_root(signer="sys"),
+            append_state=tree_state(commitments_before),
+            amount=note.amount,
+            outputs=[note.to_output()],
+        )
+        proof = self.prover.prove_deposit(request)
+        result = self.commands.deposit_shielded(
+            amount=note.amount,
+            old_root=proof.old_root,
+            output_commitments=proof.output_commitments,
+            proof_hex=proof.proof_hex,
+            output_payloads=payloads,
+            signer=signer,
+            environment=self._environment(self.start),
+        )
+        return proof, result
+
+    def _scan_inputs(self, notes: list[ShieldedNote]):
+        commitments = self._all_commitments()
+        discovered = scan_notes(
+            asset_id=self.asset_id,
+            commitments=commitments,
+            notes=notes,
+        )
+        self.assertEqual(len(discovered), len(notes))
+        discovered.sort(key=lambda record: record.leaf_index)
+        return commitments, [record.to_input() for record in discovered]
+
+    def test_deposit_execute_and_withdraw_flow(self):
+        deposit_note_a = ShieldedNote(
+            owner_secret=self.alice_keys.owner_secret,
+            amount=40,
+            rho="0x" + format(1001, "064x"),
+            blind="0x" + format(2001, "064x"),
+        )
+        deposit_note_b = ShieldedNote(
+            owner_secret=self.alice_keys.owner_secret,
+            amount=30,
+            rho="0x" + format(1002, "064x"),
+            blind="0x" + format(2002, "064x"),
+        )
+        command_change = ShieldedNote(
+            owner_secret=self.alice_keys.owner_secret,
+            amount=63,
+            rho="0x" + format(1003, "064x"),
+            blind="0x" + format(2003, "064x"),
+        )
+        withdraw_change = ShieldedNote(
+            owner_secret=self.alice_keys.owner_secret,
+            amount=43,
+            rho="0x" + format(1004, "064x"),
+            blind="0x" + format(2004, "064x"),
+        )
+
+        deposit_payload_a = deposit_note_a.to_output().encrypt_for(
+            asset_id=self.asset_id,
+            viewing_public_key=self.alice_keys.viewing_public_key,
+        )
+        deposit_payload_b = deposit_note_b.to_output().encrypt_for(
+            asset_id=self.asset_id,
+            viewing_public_key=self.alice_keys.viewing_public_key,
+        )
+        self._deposit_note(
+            deposit_note_a,
             signer=self.alice,
-            environment={"now": self.start},
+            payloads=[deposit_payload_a],
         )
+        _, deposit_result = self._deposit_note(
+            deposit_note_b,
+            signer=self.alice,
+            payloads=[deposit_payload_b],
+        )
+        self.assertEqual(deposit_result["new_root"], self.commands.current_shielded_root(signer="sys"))
+        self.assertEqual(self.commands.get_escrow_balance(signer="sys"), 70)
 
-        with self.assertRaises(AssertionError):
-            self.commands.commit_command(
-                command_hash=command_hash,
-                signer=self.alice,
-                environment={"now": self.start},
-            )
-
-        result = self.commands.execute_command(
-            command_id=command_id,
+        commitments_after_deposit, deposit_inputs = self._scan_inputs(
+            [deposit_note_a, deposit_note_b]
+        )
+        command_request = ShieldedCommandRequest(
+            asset_id=self.asset_id,
+            old_root=deposit_result["new_root"],
+            append_state=tree_state(commitments_after_deposit),
+            fee=7,
+            inputs=deposit_inputs,
+            outputs=[command_change.to_output()],
             target_contract="con_shielded_target",
-            payload=payload,
-            nonce="nonce-1",
+            payload={"increment": 4, "label": "hidden"},
+            relayer=self.relayer,
+            chain_id=self.chain_id,
+            expires_at=Datetime(2026, 1, 1, 12, 30, 0),
+        )
+        command_proof = self.prover.prove_execute(command_request)
+        command_hashes = self.commands.hash_command(
+            input_nullifiers=command_proof.input_nullifiers,
+            target_contract="con_shielded_target",
+            relayer=self.relayer,
+            fee=7,
+            payload={"increment": 4, "label": "hidden"},
+            expires_at=Datetime(2026, 1, 1, 12, 30, 0),
+            signer="sys",
+            environment={"chain_id": self.chain_id},
+        )
+        self.assertEqual(command_hashes["command_binding"], command_proof.command_binding)
+        self.assertEqual(command_hashes["execution_tag"], command_proof.execution_tag)
+
+        command_payload = command_change.to_output().encrypt_for(
+            asset_id=self.asset_id,
+            viewing_public_key=self.alice_keys.viewing_public_key,
+        )
+        command_result = self.commands.execute_command(
+            target_contract="con_shielded_target",
+            old_root=command_proof.old_root,
+            input_nullifiers=command_proof.input_nullifiers,
+            output_commitments=command_proof.output_commitments,
+            proof_hex=command_proof.proof_hex,
+            relayer_fee=7,
+            payload={"increment": 4, "label": "hidden"},
+            expires_at=Datetime(2026, 1, 1, 12, 30, 0),
+            output_payloads=[command_payload],
             signer=self.relayer,
-            environment={"now": Datetime(2026, 1, 1, 12, 5, 0)},
+            environment=self._environment(Datetime(2026, 1, 1, 12, 5, 0)),
         )
 
-        command = self.commands.get_command(command_id=command_id)
-        self.assertEqual(result, 4)
+        self.assertEqual(command_result["result"], 4)
         self.assertEqual(self.target.info()["counter"], 4)
-        self.assertEqual(command["status"], "executed")
+        self.assertEqual(self.target.info()["label"], "hidden")
+        self.assertEqual(
+            self.token.balance_of(address=self.relayer, signer="sys"), 7
+        )
+        self.assertEqual(self.commands.get_escrow_balance(signer="sys"), 63)
+        for input_nullifier in command_proof.input_nullifiers:
+            self.assertTrue(
+                self.commands.is_nullifier_spent(
+                    nullifier=input_nullifier,
+                    signer="sys",
+                )
+            )
+            self.assertEqual(
+                self.commands.get_execution_id_by_nullifier(
+                    nullifier=input_nullifier,
+                    signer="sys",
+                ),
+                0,
+            )
+        execution = self.commands.get_execution(execution_id=0, signer="sys")
+        self.assertEqual(execution["target_contract"], "con_shielded_target")
+        self.assertEqual(execution["relayer"], self.relayer)
+        self.assertEqual(execution["fee"], 7)
+        self.assertEqual(execution["nullifier_digest"], command_hashes["nullifier_digest"])
+        self.assertEqual(execution["input_count"], 2)
+        self.assertEqual(execution["input_nullifiers"], command_proof.input_nullifiers)
+        self.assertEqual(
+            self.commands.get_execution_id_by_binding(
+                command_binding=command_proof.command_binding,
+                signer="sys",
+            ),
+            0,
+        )
+        self.assertEqual(
+            self.commands.get_execution_id_by_tag(
+                execution_tag=command_proof.execution_tag,
+                signer="sys",
+            ),
+            0,
+        )
+
+        commitments_after_command, command_inputs = self._scan_inputs([command_change])
+        withdraw_request = ShieldedWithdrawRequest(
+            asset_id=self.asset_id,
+            old_root=command_result["new_root"],
+            append_state=tree_state(commitments_after_command),
+            amount=20,
+            recipient=self.bob,
+            inputs=command_inputs,
+            outputs=[withdraw_change.to_output()],
+        )
+        withdraw_proof = self.prover.prove_withdraw(withdraw_request)
+        withdraw_payload = withdraw_change.to_output().encrypt_for(
+            asset_id=self.asset_id,
+            viewing_public_key=self.alice_keys.viewing_public_key,
+        )
+        withdraw_result = self.commands.withdraw_shielded(
+            amount=20,
+            to=self.bob,
+            old_root=withdraw_proof.old_root,
+            input_nullifiers=withdraw_proof.input_nullifiers,
+            output_commitments=withdraw_proof.output_commitments,
+            proof_hex=withdraw_proof.proof_hex,
+            output_payloads=[withdraw_payload],
+            signer=self.alice,
+            environment=self._environment(Datetime(2026, 1, 1, 12, 10, 0)),
+        )
+
+        self.assertEqual(withdraw_result["new_root"], self.commands.current_shielded_root(signer="sys"))
+        self.assertEqual(self.token.balance_of(address=self.bob, signer="sys"), 20)
+        self.assertEqual(self.commands.get_escrow_balance(signer="sys"), 43)
+        records = self.commands.list_note_records(
+            start=0,
+            limit=self.commands.get_note_count(signer="sys"),
+            signer="sys",
+        )
+        self.assertEqual(records[0]["payload"], deposit_payload_a)
+        self.assertEqual(records[1]["payload"], deposit_payload_b)
+        self.assertEqual(records[2]["payload"], command_payload)
+        self.assertEqual(records[3]["payload"], withdraw_payload)
+
+    def test_command_binding_rejects_wrong_relayer_and_replay(self):
+        deposit_note = ShieldedNote(
+            owner_secret=self.alice_keys.owner_secret,
+            amount=40,
+            rho="0x" + format(1101, "064x"),
+            blind="0x" + format(2101, "064x"),
+        )
+        change_note = ShieldedNote(
+            owner_secret=self.alice_keys.owner_secret,
+            amount=35,
+            rho="0x" + format(1102, "064x"),
+            blind="0x" + format(2102, "064x"),
+        )
+
+        _, deposit_result = self._deposit_note(deposit_note, signer=self.alice)
+        commitments_after_deposit, deposit_inputs = self._scan_inputs([deposit_note])
+        command_request = ShieldedCommandRequest(
+            asset_id=self.asset_id,
+            old_root=deposit_result["new_root"],
+            append_state=tree_state(commitments_after_deposit),
+            fee=5,
+            inputs=deposit_inputs,
+            outputs=[change_note.to_output()],
+            target_contract="con_shielded_target",
+            payload={"increment": 2, "label": "bound"},
+            relayer=self.relayer,
+            chain_id=self.chain_id,
+            expires_at=Datetime(2026, 1, 1, 12, 20, 0),
+        )
+        command_proof = self.prover.prove_execute(command_request)
 
         with self.assertRaises(AssertionError):
-            self.commands.commit_command(
-                command_hash=command_hash,
-                signer=self.alice,
-                environment={"now": Datetime(2026, 1, 1, 12, 6, 0)},
+            self.commands.execute_command(
+                target_contract="con_shielded_target",
+                old_root=command_proof.old_root,
+                input_nullifiers=command_proof.input_nullifiers,
+                output_commitments=command_proof.output_commitments,
+                proof_hex=command_proof.proof_hex,
+                relayer_fee=5,
+                payload={"increment": 2, "label": "bound"},
+                expires_at=Datetime(2026, 1, 1, 12, 20, 0),
+                signer=self.alt_relayer,
+                environment=self._environment(Datetime(2026, 1, 1, 12, 5, 0)),
             )
 
-    def test_expired_command_cannot_be_executed(self):
-        payload = {"increment": 1, "label": "late"}
-        command_hash = self.commands.hash_command(
+        self.commands.execute_command(
             target_contract="con_shielded_target",
-            payload=payload,
-            nonce="nonce-2",
-        )
-
-        command_id = self.commands.commit_command(
-            command_hash=command_hash,
-            expires_at=Datetime(2026, 1, 1, 12, 1, 0),
-            signer=self.alice,
-            environment={"now": self.start},
-        )
-
-        status = self.commands.execute_command(
-            command_id=command_id,
-            target_contract="con_shielded_target",
-            payload=payload,
-            nonce="nonce-2",
+            old_root=command_proof.old_root,
+            input_nullifiers=command_proof.input_nullifiers,
+            output_commitments=command_proof.output_commitments,
+            proof_hex=command_proof.proof_hex,
+            relayer_fee=5,
+            payload={"increment": 2, "label": "bound"},
+            expires_at=Datetime(2026, 1, 1, 12, 20, 0),
             signer=self.relayer,
-            environment={"now": Datetime(2026, 1, 1, 12, 2, 0)},
+            environment=self._environment(Datetime(2026, 1, 1, 12, 5, 0)),
         )
 
-        command = self.commands.get_command(command_id=command_id)
-        self.assertEqual(status, "expired")
-        self.assertEqual(command["status"], "expired")
+        with self.assertRaises(AssertionError):
+            self.commands.execute_command(
+                target_contract="con_shielded_target",
+                old_root=command_proof.old_root,
+                input_nullifiers=command_proof.input_nullifiers,
+                output_commitments=command_proof.output_commitments,
+                proof_hex=command_proof.proof_hex,
+                relayer_fee=5,
+                payload={"increment": 2, "label": "bound"},
+                expires_at=Datetime(2026, 1, 1, 12, 20, 0),
+                signer=self.relayer,
+                environment=self._environment(Datetime(2026, 1, 1, 12, 6, 0)),
+            )
+
+    def test_expired_command_reverts_without_paying_fee(self):
+        deposit_note = ShieldedNote(
+            owner_secret=self.alice_keys.owner_secret,
+            amount=30,
+            rho="0x" + format(1201, "064x"),
+            blind="0x" + format(2201, "064x"),
+        )
+        change_note = ShieldedNote(
+            owner_secret=self.alice_keys.owner_secret,
+            amount=26,
+            rho="0x" + format(1202, "064x"),
+            blind="0x" + format(2202, "064x"),
+        )
+
+        _, deposit_result = self._deposit_note(deposit_note, signer=self.alice)
+        commitments_after_deposit, deposit_inputs = self._scan_inputs([deposit_note])
+        command_request = ShieldedCommandRequest(
+            asset_id=self.asset_id,
+            old_root=deposit_result["new_root"],
+            append_state=tree_state(commitments_after_deposit),
+            fee=4,
+            inputs=deposit_inputs,
+            outputs=[change_note.to_output()],
+            target_contract="con_shielded_target",
+            payload={"increment": 1, "label": "late"},
+            relayer=self.relayer,
+            chain_id=self.chain_id,
+            expires_at=Datetime(2026, 1, 1, 12, 1, 0),
+        )
+        command_proof = self.prover.prove_execute(command_request)
+
+        with self.assertRaises(AssertionError):
+            self.commands.execute_command(
+                target_contract="con_shielded_target",
+                old_root=command_proof.old_root,
+                input_nullifiers=command_proof.input_nullifiers,
+                output_commitments=command_proof.output_commitments,
+                proof_hex=command_proof.proof_hex,
+                relayer_fee=4,
+                payload={"increment": 1, "label": "late"},
+                expires_at=Datetime(2026, 1, 1, 12, 1, 0),
+                signer=self.relayer,
+                environment=self._environment(Datetime(2026, 1, 1, 12, 2, 0)),
+            )
+
+        self.assertEqual(self.target.info()["counter"], 0)
+        self.assertEqual(
+            self.token.balance_of(address=self.relayer, signer="sys"), 0
+        )
+        self.assertFalse(
+            self.commands.is_nullifier_spent(
+                nullifier=command_proof.input_nullifiers[0],
+                signer="sys",
+            )
+        )
+        self.assertEqual(self.commands.get_escrow_balance(signer="sys"), 30)
 
 
 if __name__ == "__main__":

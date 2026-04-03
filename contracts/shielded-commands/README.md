@@ -1,7 +1,6 @@
 # Shielded Commands
 
-Commit/reveal private-command coordinator scaffold intended to sit beside the
-shielded-note token stack.
+Proof-backed shielded command pool for anonymous relayed contract execution.
 
 ## Status
 
@@ -9,25 +8,27 @@ shielded-note token stack.
 
 ## Contracts
 
-- `src/con_shielded_commands.py`: canonical command hashing, target allowlist,
-  relayer policy, and commit/reveal execution coordinator
+- `src/con_shielded_commands.py`: shielded escrow, root/nullifier state,
+  target allowlist, relayer policy, proof verification, and command execution
 
 ## Notes
 
-- This package does not yet verify zero-knowledge proofs on its own.
-- The current contract captures the coordinator surface that Gamma Phi's
-  `private_command` idea made interesting: canonical command hashing, target
-  allowlisting, relayer policy, and explicit execution replay.
+- Public tokens are escrowed in the contract and represented as shielded notes.
+- `deposit_shielded` and `withdraw_shielded` use Groth16 proofs plus accepted
+  roots, spent nullifiers, and note commitments.
+- `execute_command` spends one hidden note, binds the proof to an exact
+  relayer/target/payload/expiry tuple, pays the relayer fee from escrow, and
+  optionally emits hidden change notes.
 - Executed commands target a fixed exported `interact(payload: dict)`
-  entrypoint so the scaffold stays compatible with Xian contract constraints.
-- Active command hashes are deduplicated, executed hashes become non-replayable,
-  and expirable commands can be marked stale instead of lingering forever.
-- The intended next step is proof-gated integration with
-  `contracts/shielded-note-token/` and `zk_registry`.
-- Until that lands, treat this package as architecture scaffolding rather than
-  a privacy primitive.
+  entrypoint so the executor stays compatible with Xian contract constraints.
+- The contract requires exact-balance token transfers, so fee-on-transfer or
+  rebasing tokens are not suitable fee assets.
+- The privacy boundary is sender privacy and relayed execution, not invisible
+  side effects: the target contract call and its public state changes are still
+  observable on-chain.
 
 ## Validation
 
 - repo-wide lint and compile checks
-- package-local automated tests for relayed execution and expiry/replay guards
+- package-local proof-backed tests covering deposit, command execution,
+  relayer binding, replay protection, and expiry handling

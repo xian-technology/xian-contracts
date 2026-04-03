@@ -24,7 +24,7 @@ This folder contains the curated contract packages in `xian-contracts`.
 - `profile-registry/`: social profile and channel registry scaffold
 - `privacy-token/`: commitment-based privacy token experiment
 - `scheduled-actions/`: allowlisted delayed-call scheduler
-- `shielded-commands/`: commit/reveal private-command coordinator scaffold
+- `shielded-commands/`: proof-backed shielded command pool for relayed execution
 - `shielded-note-token/`: root/nullifier/note-based shielded token contract
 - `reflection-token/`: fee-on-transfer reflection token
 - `stream-payments/`: standalone escrowed token streaming contract

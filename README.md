@@ -39,7 +39,7 @@ uv run pytest -m slow
 | `contracts/reflection-token` | candidate | Reflection token designed to integrate with the Xian DEX |
 | `contracts/privacy-token` | experimental | Commitment-based token experiment without zero-knowledge proofs |
 | `contracts/lottery` | experimental | Simple lottery pattern using deterministic public randomness |
-| `contracts/shielded-commands` | experimental | Commit/reveal private-command coordinator intended for shielded-note integration |
+| `contracts/shielded-commands` | experimental | Proof-backed shielded command pool for anonymous relayed contract execution |
 | `contracts/turn-based-games` | experimental | Generic match registry for turn-based games and off-chain move/state refs |
 | `contracts/weighted-lottery` | experimental | Ticket-weighted lottery example with configurable token pricing |
 
