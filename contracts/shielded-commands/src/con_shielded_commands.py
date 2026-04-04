@@ -15,7 +15,9 @@ MAX_ROOT_HISTORY_WINDOW = 64
 MAX_COMMITMENT_PAGE_SIZE = 128
 MAX_OUTPUT_PAYLOAD_BYTES = 4096
 TARGET_ENTRYPOINT = "interact"
-COMMAND_BINDING_VERSION = "shielded-command-v2"
+COMMAND_BINDING_VERSION = "shielded-command-v4"
+COMMAND_CIRCUIT_FAMILY = "shielded_command_v4"
+COMMAND_STATEMENT_VERSION = "4"
 
 
 def require_positive_amount(amount: int):
@@ -32,6 +34,11 @@ def require_shielded_amount(amount: int):
 def require_fee_amount(amount: int):
     assert isinstance(amount, int), "Fee must be an integer!"
     assert 0 <= amount <= MAX_NOTE_AMOUNT, "Fee is out of range!"
+
+
+def require_public_amount(amount: int):
+    assert isinstance(amount, int), "public_amount must be an integer!"
+    assert 0 <= amount <= MAX_NOTE_AMOUNT, "public_amount is out of range!"
 
 
 def u256_hex(value: int):
@@ -285,9 +292,11 @@ def command_binding_hex(
     relayer: str = "",
     expires_at: datetime.datetime = None,
     fee: int = 0,
+    public_amount: int = 0,
 ):
     expires_at = normalize_expires_at(expires_at)
     require_fee_amount(fee)
+    require_public_amount(public_amount)
     return field_hex_from_int(
         mimc_hash_many_int(
             [
@@ -300,6 +309,7 @@ def command_binding_hex(
                 field_int(command_entrypoint_digest()),
                 field_int(command_version_digest()),
                 fee,
+                public_amount,
             ]
         )
     )
@@ -389,6 +399,20 @@ def require_output_payloads(output_payloads: list, expected_count: int):
     return normalized
 
 
+def output_payload_hash(payload: str):
+    if payload is None or payload == "":
+        return FIELD_ZERO_HEX
+    require_hex_blob("output payload", payload)
+    return field_hex_from_text(payload)
+
+
+def output_payload_hashes(output_payloads: list):
+    hashes = []
+    for payload in output_payloads:
+        hashes.append(output_payload_hash(payload))
+    return hashes
+
+
 def pad_field_values(values: list, size: int):
     padded = []
     for value in values:
@@ -428,6 +452,26 @@ def acquire_execution_lock():
 
 def release_execution_lock():
     execution_lock.set(False)
+
+
+def activate_execution_target(target_contract: str, public_amount: int):
+    active_execution_target.set(target_contract)
+    active_public_spend_remaining.set(public_amount)
+
+
+def clear_execution_target():
+    active_execution_target.set("")
+    active_public_spend_remaining.set(0)
+
+
+def require_active_execution_target():
+    assert execution_lock.get() is True, "Execution is not in progress."
+    target_contract = active_execution_target.get()
+    assert isinstance(target_contract, str) and target_contract != "", (
+        "No active execution target."
+    )
+    assert ctx.caller == target_contract, "Only the active target can spend publicly."
+    return target_contract
 
 
 def require_target_contract(target_contract: str):
@@ -539,9 +583,11 @@ def append_output_commitments(output_commitments: list, output_payloads: list):
         note_metadata[commitment, "root"] = new_root
         note_metadata[commitment, "created_at"] = now
         payload = output_payloads[index]
+        payload_hash = output_payload_hash(payload)
         if payload == "":
             payload = None
         note_metadata[commitment, "payload"] = payload
+        note_metadata[commitment, "payload_hash"] = payload_hash
 
     accept_root(new_root)
     return new_root
@@ -567,7 +613,9 @@ def verify_proof(action: str, proof_hex: str, public_inputs: list):
     )
 
 
-def deposit_public_inputs(old_root: str, amount: int, commitments: list):
+def deposit_public_inputs(
+    old_root: str, amount: int, commitments: list, payload_hashes: list
+):
     inputs = [
         contract_asset_id(),
         old_root,
@@ -575,6 +623,7 @@ def deposit_public_inputs(old_root: str, amount: int, commitments: list):
         u256_hex(len(commitments)),
     ]
     inputs.extend(pad_field_values(commitments, MAX_OUTPUT_COMMITMENTS))
+    inputs.extend(pad_field_values(payload_hashes, MAX_OUTPUT_COMMITMENTS))
     return inputs
 
 
@@ -583,8 +632,10 @@ def command_public_inputs(
     command_binding: str,
     execution_tag: str,
     fee: int,
+    public_amount: int,
     input_nullifiers: list,
     commitments: list,
+    payload_hashes: list,
 ):
     inputs = [
         contract_asset_id(),
@@ -592,11 +643,13 @@ def command_public_inputs(
         command_binding,
         execution_tag,
         u256_hex(fee),
+        u256_hex(public_amount),
         u256_hex(len(input_nullifiers)),
         u256_hex(len(commitments)),
     ]
     inputs.extend(pad_field_values(input_nullifiers, MAX_INPUT_NULLIFIERS))
     inputs.extend(pad_field_values(commitments, MAX_OUTPUT_COMMITMENTS))
+    inputs.extend(pad_field_values(payload_hashes, MAX_OUTPUT_COMMITMENTS))
     return inputs
 
 
@@ -613,6 +666,7 @@ def withdraw_public_inputs(
     recipient: str,
     nullifiers: list,
     commitments: list,
+    payload_hashes: list,
 ):
     inputs = [
         contract_asset_id(),
@@ -624,6 +678,7 @@ def withdraw_public_inputs(
     ]
     inputs.extend(pad_field_values(nullifiers, MAX_INPUT_NULLIFIERS))
     inputs.extend(pad_field_values(commitments, MAX_OUTPUT_COMMITMENTS))
+    inputs.extend(pad_field_values(payload_hashes, MAX_OUTPUT_COMMITMENTS))
     return inputs
 
 
@@ -641,6 +696,8 @@ root_count = Variable()
 current_root = Variable()
 execution_count = Variable()
 execution_lock = Variable()
+active_execution_target = Variable()
+active_public_spend_remaining = Variable()
 
 vk_ids = Hash()
 vk_hashes = Hash()
@@ -706,6 +763,7 @@ ShieldedCommandExecuted = LogEvent(
         "input_count": {"type": int},
         "command_binding": {"type": str},
         "fee": {"type": int},
+        "public_amount": {"type": int},
         "new_root": {"type": str},
     },
 )
@@ -752,6 +810,8 @@ def seed(
     current_root.set(ZERO_ROOT)
     execution_count.set(0)
     execution_lock.set(False)
+    active_execution_target.set("")
+    active_public_spend_remaining.set(0)
     accepted_roots[ZERO_ROOT] = True
     root_history[0] = ZERO_ROOT
     note_count.set(0)
@@ -789,6 +849,11 @@ def get_escrow_balance():
 
 
 @export
+def get_active_public_spend_remaining():
+    return active_public_spend_remaining.get()
+
+
+@export
 def get_vk_id(action: str):
     require_action(action)
     return vk_ids[action]
@@ -819,6 +884,8 @@ def zero_shielded_root():
 @export
 def get_proof_config():
     return {
+        "circuit_family": COMMAND_CIRCUIT_FAMILY,
+        "statement_version": COMMAND_STATEMENT_VERSION,
         "tree_depth": SHIELDED_TREE_DEPTH,
         "leaf_capacity": MAX_NOTE_LEAVES,
         "max_inputs": MAX_INPUT_NULLIFIERS,
@@ -858,6 +925,7 @@ def get_commitment_info(commitment: str):
         "root": note_metadata[commitment, "root"],
         "created_at": note_metadata[commitment, "created_at"],
         "payload": note_metadata[commitment, "payload"],
+        "payload_hash": note_metadata[commitment, "payload_hash"],
     }
 
 
@@ -867,6 +935,14 @@ def get_note_payload(commitment: str):
     if note_exists[commitment] is not True:
         return None
     return note_metadata[commitment, "payload"]
+
+
+@export
+def get_note_payload_hash(commitment: str):
+    require_field_hex32("commitment", commitment)
+    if note_exists[commitment] is not True:
+        return None
+    return note_metadata[commitment, "payload_hash"]
 
 
 @export
@@ -932,6 +1008,7 @@ def list_note_records(start: int = 0, limit: int = 64):
                 "index": index,
                 "commitment": commitment,
                 "payload": note_metadata[commitment, "payload"],
+                "payload_hash": note_metadata[commitment, "payload_hash"],
                 "created_at": note_metadata[commitment, "created_at"],
             }
         )
@@ -946,6 +1023,31 @@ def is_target_allowed(target_contract: str):
 @export
 def is_relayer_allowed(account: str):
     return relayers[account] is True
+
+
+@export
+def adapter_spend_public(amount: int, to: str):
+    require_active_execution_target()
+    require_positive_amount(amount)
+    assert isinstance(to, str) and to != "", "to must be a non-empty string."
+    remaining = active_public_spend_remaining.get()
+    assert amount <= remaining, "Requested public spend exceeds remaining budget."
+
+    token = token_module()
+    contract_balance_before = token.balance_of(ctx.this)
+    recipient_balance_before = token.balance_of(to)
+    token.transfer(amount=amount, to=to)
+    contract_balance_after = token.balance_of(ctx.this)
+    recipient_balance_after = token.balance_of(to)
+    assert contract_balance_before - contract_balance_after == amount, (
+        "Public spend transfer must debit the exact amount."
+    )
+    assert recipient_balance_after - recipient_balance_before == amount, (
+        "Public spend recipient did not receive the exact amount."
+    )
+    active_public_spend_remaining.set(remaining - amount)
+    escrow_balance.set(escrow_balance.get() - amount)
+    return amount
 
 
 @export
@@ -971,6 +1073,7 @@ def get_execution(execution_id: int):
         "input_count": input_count,
         "input_nullifiers": input_nullifiers,
         "fee": executions[execution_id, "fee"],
+        "public_amount": executions[execution_id, "public_amount"],
         "old_root": executions[execution_id, "old_root"],
         "new_root": executions[execution_id, "new_root"],
         "output_count": executions[execution_id, "output_count"],
@@ -1025,6 +1128,25 @@ def configure_vk(action: str, vk_id: str):
     assert info is not None and info["active"] is True, (
         "Unknown or inactive verifying key!"
     )
+    assert info["deprecated"] is not True, "Verifying key is deprecated!"
+    assert info["circuit_family"] == COMMAND_CIRCUIT_FAMILY, (
+        "Verifying key circuit family mismatch!"
+    )
+    assert info["statement_version"] == COMMAND_STATEMENT_VERSION, (
+        "Verifying key statement version mismatch!"
+    )
+    assert info["tree_depth"] == SHIELDED_TREE_DEPTH, (
+        "Verifying key tree depth mismatch!"
+    )
+    assert info["leaf_capacity"] == MAX_NOTE_LEAVES, (
+        "Verifying key leaf capacity mismatch!"
+    )
+    assert info["max_inputs"] == MAX_INPUT_NULLIFIERS, (
+        "Verifying key max_inputs mismatch!"
+    )
+    assert info["max_outputs"] == MAX_OUTPUT_COMMITMENTS, (
+        "Verifying key max_outputs mismatch!"
+    )
     vk_ids[action] = vk_id
     vk_hashes[action] = info["vk_hash"]
     VkConfigured({"action": action, "vk_id": vk_id})
@@ -1065,11 +1187,14 @@ def hash_command(
     target_contract: str,
     relayer: str,
     fee: int,
+    public_amount: int = 0,
     payload: dict = None,
     expires_at: datetime.datetime = None,
 ):
     require_target_contract(target_contract)
     require_nullifiers(input_nullifiers)
+    require_fee_amount(fee)
+    require_public_amount(public_amount)
     expires_at = normalize_expires_at(expires_at)
     binding = command_binding_hex(
         input_nullifiers=input_nullifiers,
@@ -1078,6 +1203,7 @@ def hash_command(
         relayer=relayer,
         expires_at=expires_at,
         fee=fee,
+        public_amount=public_amount,
     )
     return {
         "nullifier_digest": command_nullifier_digest_hex(input_nullifiers),
@@ -1100,6 +1226,7 @@ def deposit_shielded(
     output_payloads = require_output_payloads(
         output_payloads, len(output_commitments)
     )
+    payload_hashes = output_payload_hashes(output_payloads)
     assert note_count.get() + len(output_commitments) <= MAX_NOTE_LEAVES, (
         "Shielded note tree is full!"
     )
@@ -1108,6 +1235,7 @@ def deposit_shielded(
         old_root=old_root,
         amount=amount,
         commitments=output_commitments,
+        payload_hashes=payload_hashes,
     )
     verify_proof("deposit", proof_hex, public_inputs)
 
@@ -1149,6 +1277,7 @@ def execute_command(
     output_commitments: list,
     proof_hex: str,
     relayer_fee: int = 0,
+    public_amount: int = 0,
     payload: dict = None,
     expires_at: datetime.datetime = None,
     output_payloads: list = None,
@@ -1159,10 +1288,12 @@ def execute_command(
     require_nullifiers(input_nullifiers)
     require_commitments(output_commitments, 0)
     require_fee_amount(relayer_fee)
+    require_public_amount(public_amount)
     expires_at = normalize_expires_at(expires_at)
     output_payloads = require_output_payloads(
         output_payloads, len(output_commitments)
     )
+    payload_hashes = output_payload_hashes(output_payloads)
     assert note_count.get() + len(output_commitments) <= MAX_NOTE_LEAVES, (
         "Shielded note tree is full!"
     )
@@ -1182,6 +1313,7 @@ def execute_command(
         relayer=ctx.caller,
         expires_at=expires_at,
         fee=relayer_fee,
+        public_amount=public_amount,
     )
     execution_tag = command_execution_tag_hex(input_nullifiers, binding)
     nullifier_digest = command_nullifier_digest_hex(input_nullifiers)
@@ -1192,29 +1324,40 @@ def execute_command(
         command_binding=binding,
         execution_tag=execution_tag,
         fee=relayer_fee,
+        public_amount=public_amount,
         input_nullifiers=input_nullifiers,
         commitments=output_commitments,
+        payload_hashes=payload_hashes,
     )
     verify_proof("command", proof_hex, public_inputs)
 
     acquire_execution_lock()
     token = token_module()
     contract_balance_before = token.balance_of(ctx.this)
-    assert contract_balance_before >= relayer_fee, "Escrow balance is too low."
+    assert contract_balance_before >= relayer_fee + public_amount, (
+        "Escrow balance is too low."
+    )
 
     spend_nullifiers(input_nullifiers)
     new_root = append_output_commitments(output_commitments, output_payloads)
+    activate_execution_target(target_contract, public_amount)
 
     module = importlib.import_module(target_contract)
     result = module.interact(payload=normalize_payload(payload))
+    assert active_public_spend_remaining.get() == 0, (
+        "Target did not consume the full public spend budget."
+    )
+    clear_execution_target()
 
     if relayer_fee > 0:
         relayer_balance_before = token.balance_of(ctx.caller)
         token.transfer(amount=relayer_fee, to=ctx.caller)
         relayer_balance_after = token.balance_of(ctx.caller)
         contract_balance_after = token.balance_of(ctx.this)
-        assert contract_balance_before - contract_balance_after == relayer_fee, (
-            "Token transfer must debit the exact relayer fee!"
+        assert contract_balance_before - contract_balance_after == (
+            relayer_fee + public_amount
+        ), (
+            "Token transfers must debit the exact relayer fee plus public spend!"
         )
         assert relayer_balance_after - relayer_balance_before == relayer_fee, (
             "Relayer did not receive the exact fee!"
@@ -1222,8 +1365,8 @@ def execute_command(
         escrow_balance.set(escrow_balance.get() - relayer_fee)
     else:
         contract_balance_after = token.balance_of(ctx.this)
-        assert contract_balance_after == contract_balance_before, (
-            "Escrow balance changed unexpectedly!"
+        assert contract_balance_before - contract_balance_after == public_amount, (
+            "Escrow balance changed by an unexpected amount."
         )
 
     assert_escrow_invariant(token)
@@ -1243,6 +1386,7 @@ def execute_command(
     execution_by_binding[binding] = execution_id
     execution_by_tag[execution_tag] = execution_id
     executions[execution_id, "fee"] = relayer_fee
+    executions[execution_id, "public_amount"] = public_amount
     executions[execution_id, "old_root"] = old_root
     executions[execution_id, "new_root"] = new_root
     executions[execution_id, "output_count"] = len(output_commitments)
@@ -1259,6 +1403,7 @@ def execute_command(
             "input_count": len(input_nullifiers),
             "command_binding": binding,
             "fee": relayer_fee,
+            "public_amount": public_amount,
             "new_root": new_root,
         }
     )
@@ -1289,6 +1434,7 @@ def withdraw_shielded(
     output_payloads = require_output_payloads(
         output_payloads, len(output_commitments)
     )
+    payload_hashes = output_payload_hashes(output_payloads)
     assert note_count.get() + len(output_commitments) <= MAX_NOTE_LEAVES, (
         "Shielded note tree is full!"
     )
@@ -1299,6 +1445,7 @@ def withdraw_shielded(
         recipient=to,
         nullifiers=input_nullifiers,
         commitments=output_commitments,
+        payload_hashes=payload_hashes,
     )
     verify_proof("withdraw", proof_hex, public_inputs)
 

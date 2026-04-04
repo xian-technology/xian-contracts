@@ -34,10 +34,11 @@ uv run pytest -m slow
 | `contracts/dex` | candidate | Multi-contract DEX package with pairs, router, and helper contracts |
 | `contracts/profile-registry` | candidate | Social profile and channel registry scaffold with username resolution |
 | `contracts/scheduled-actions` | candidate | Allowlisted delayed-call scheduler with cancellation and execution controls |
+| `contracts/shielded-dex-adapter` | candidate | Capability-style adapter that lets shielded commands spend a proof-bound public budget through the Xian DEX |
+| `contracts/shielded-scheduler-adapter` | candidate | Capability-style adapter that lets shielded commands drive scheduled-actions without exposing a stable user identity |
 | `contracts/stream-payments` | candidate | Standalone escrowed token-stream contract extracted from legacy XSC003-style logic |
 | `contracts/shielded-note-token` | candidate | Root/nullifier/note-based shielded token contract with registry-backed zk verification ids |
 | `contracts/reflection-token` | candidate | Reflection token designed to integrate with the Xian DEX |
-| `contracts/privacy-token` | experimental | Commitment-based token experiment without zero-knowledge proofs |
 | `contracts/lottery` | experimental | Simple lottery pattern using deterministic public randomness |
 | `contracts/shielded-commands` | experimental | Proof-backed shielded command pool for anonymous relayed contract execution |
 | `contracts/turn-based-games` | experimental | Generic match registry for turn-based games and off-chain move/state refs |
@@ -69,3 +70,4 @@ flows.
 - [contracts/README.md](contracts/README.md)
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - [docs/BACKLOG.md](docs/BACKLOG.md)
+- [docs/SHIELDED_STACK.md](docs/SHIELDED_STACK.md)

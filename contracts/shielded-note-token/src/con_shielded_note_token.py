@@ -14,6 +14,8 @@ MAX_NOTE_AMOUNT = 2**64 - 1
 MAX_ROOT_HISTORY_WINDOW = 64
 MAX_COMMITMENT_PAGE_SIZE = 128
 MAX_OUTPUT_PAYLOAD_BYTES = 4096
+NOTE_CIRCUIT_FAMILY = "shielded_note_v3"
+NOTE_STATEMENT_VERSION = "3"
 
 
 def require_positive_amount(amount: int):
@@ -244,6 +246,20 @@ def require_output_payloads(output_payloads: list, expected_count: int):
     return normalized
 
 
+def output_payload_hash(payload: str):
+    if payload is None or payload == "":
+        return FIELD_ZERO_HEX
+    require_hex_blob("output payload", payload)
+    return field_hex_from_text(payload)
+
+
+def output_payload_hashes(output_payloads: list):
+    hashes = []
+    for payload in output_payloads:
+        hashes.append(output_payload_hash(payload))
+    return hashes
+
+
 def pad_field_values(values: list, size: int):
     padded = []
     for value in values:
@@ -359,9 +375,11 @@ def append_output_commitments(output_commitments: list, output_payloads: list):
         note_metadata[commitment, "root"] = new_root
         note_metadata[commitment, "created_at"] = now
         payload = output_payloads[index]
+        payload_hash = output_payload_hash(payload)
         if payload == "":
             payload = None
         note_metadata[commitment, "payload"] = payload
+        note_metadata[commitment, "payload_hash"] = payload_hash
 
     accept_root(new_root)
     return new_root
@@ -387,7 +405,9 @@ def verify_proof(action: str, proof_hex: str, public_inputs: list):
     )
 
 
-def deposit_public_inputs(old_root: str, amount: int, commitments: list):
+def deposit_public_inputs(
+    old_root: str, amount: int, commitments: list, payload_hashes: list
+):
     inputs = [
         contract_asset_id(),
         old_root,
@@ -395,10 +415,13 @@ def deposit_public_inputs(old_root: str, amount: int, commitments: list):
         u256_hex(len(commitments)),
     ]
     inputs.extend(pad_field_values(commitments, MAX_OUTPUT_COMMITMENTS))
+    inputs.extend(pad_field_values(payload_hashes, MAX_OUTPUT_COMMITMENTS))
     return inputs
 
 
-def transfer_public_inputs(old_root: str, nullifiers: list, commitments: list):
+def transfer_public_inputs(
+    old_root: str, nullifiers: list, commitments: list, payload_hashes: list
+):
     inputs = [
         contract_asset_id(),
         old_root,
@@ -407,6 +430,7 @@ def transfer_public_inputs(old_root: str, nullifiers: list, commitments: list):
     ]
     inputs.extend(pad_field_values(nullifiers, MAX_INPUT_NULLIFIERS))
     inputs.extend(pad_field_values(commitments, MAX_OUTPUT_COMMITMENTS))
+    inputs.extend(pad_field_values(payload_hashes, MAX_OUTPUT_COMMITMENTS))
     return inputs
 
 
@@ -416,6 +440,7 @@ def withdraw_public_inputs(
     recipient: str,
     nullifiers: list,
     commitments: list,
+    payload_hashes: list,
 ):
     inputs = [
         contract_asset_id(),
@@ -427,6 +452,7 @@ def withdraw_public_inputs(
     ]
     inputs.extend(pad_field_values(nullifiers, MAX_INPUT_NULLIFIERS))
     inputs.extend(pad_field_values(commitments, MAX_OUTPUT_COMMITMENTS))
+    inputs.extend(pad_field_values(payload_hashes, MAX_OUTPUT_COMMITMENTS))
     return inputs
 
 
@@ -622,6 +648,8 @@ def zero_shielded_root():
 @export
 def get_proof_config():
     return {
+        "circuit_family": NOTE_CIRCUIT_FAMILY,
+        "statement_version": NOTE_STATEMENT_VERSION,
         "tree_depth": SHIELDED_TREE_DEPTH,
         "leaf_capacity": MAX_NOTE_LEAVES,
         "max_inputs": MAX_INPUT_NULLIFIERS,
@@ -660,6 +688,7 @@ def get_commitment_info(commitment: str):
         "root": note_metadata[commitment, "root"],
         "created_at": note_metadata[commitment, "created_at"],
         "payload": note_metadata[commitment, "payload"],
+        "payload_hash": note_metadata[commitment, "payload_hash"],
     }
 
 
@@ -669,6 +698,14 @@ def get_note_payload(commitment: str):
     if note_exists[commitment] is not True:
         return None
     return note_metadata[commitment, "payload"]
+
+
+@export
+def get_note_payload_hash(commitment: str):
+    require_field_hex32("commitment", commitment)
+    if note_exists[commitment] is not True:
+        return None
+    return note_metadata[commitment, "payload_hash"]
 
 
 @export
@@ -734,6 +771,7 @@ def list_note_records(start: int = 0, limit: int = 64):
                 "index": index,
                 "commitment": commitment,
                 "payload": note_metadata[commitment, "payload"],
+                "payload_hash": note_metadata[commitment, "payload_hash"],
                 "created_at": note_metadata[commitment, "created_at"],
             }
         )
@@ -819,6 +857,25 @@ def configure_vk(action: str, vk_id: str):
     assert info is not None and info["active"] is True, (
         "Unknown or inactive verifying key!"
     )
+    assert info["deprecated"] is not True, "Verifying key is deprecated!"
+    assert info["circuit_family"] == NOTE_CIRCUIT_FAMILY, (
+        "Verifying key circuit family mismatch!"
+    )
+    assert info["statement_version"] == NOTE_STATEMENT_VERSION, (
+        "Verifying key statement version mismatch!"
+    )
+    assert info["tree_depth"] == SHIELDED_TREE_DEPTH, (
+        "Verifying key tree depth mismatch!"
+    )
+    assert info["leaf_capacity"] == MAX_NOTE_LEAVES, (
+        "Verifying key leaf capacity mismatch!"
+    )
+    assert info["max_inputs"] == MAX_INPUT_NULLIFIERS, (
+        "Verifying key max_inputs mismatch!"
+    )
+    assert info["max_outputs"] == MAX_OUTPUT_COMMITMENTS, (
+        "Verifying key max_outputs mismatch!"
+    )
     vk_ids[action] = vk_id
     vk_hashes[action] = info["vk_hash"]
     VkConfigured({"action": action, "vk_id": vk_id})
@@ -854,6 +911,7 @@ def deposit_shielded(
     output_payloads = require_output_payloads(
         output_payloads, len(output_commitments)
     )
+    payload_hashes = output_payload_hashes(output_payloads)
     assert balances[ctx.caller] >= amount, "Not enough public balance!"
     assert note_count.get() + len(output_commitments) <= MAX_NOTE_LEAVES, (
         "Shielded note tree is full!"
@@ -863,6 +921,7 @@ def deposit_shielded(
         old_root=old_root,
         amount=amount,
         commitments=output_commitments,
+        payload_hashes=payload_hashes,
     )
     verify_proof("deposit", proof_hex, public_inputs)
 
@@ -902,6 +961,7 @@ def transfer_shielded(
     output_payloads = require_output_payloads(
         output_payloads, len(output_commitments)
     )
+    payload_hashes = output_payload_hashes(output_payloads)
     assert note_count.get() + len(output_commitments) <= MAX_NOTE_LEAVES, (
         "Shielded note tree is full!"
     )
@@ -910,6 +970,7 @@ def transfer_shielded(
         old_root=old_root,
         nullifiers=input_nullifiers,
         commitments=output_commitments,
+        payload_hashes=payload_hashes,
     )
     verify_proof("transfer", proof_hex, public_inputs)
 
@@ -952,6 +1013,7 @@ def withdraw_shielded(
     output_payloads = require_output_payloads(
         output_payloads, len(output_commitments)
     )
+    payload_hashes = output_payload_hashes(output_payloads)
     assert note_count.get() + len(output_commitments) <= MAX_NOTE_LEAVES, (
         "Shielded note tree is full!"
     )
@@ -962,6 +1024,7 @@ def withdraw_shielded(
         recipient=to,
         nullifiers=input_nullifiers,
         commitments=output_commitments,
+        payload_hashes=payload_hashes,
     )
     verify_proof("withdraw", proof_hex, public_inputs)
 

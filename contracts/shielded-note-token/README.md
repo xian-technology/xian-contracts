@@ -57,8 +57,9 @@ The contract exposes:
 - Shielded outputs are addressed to `owner_public`, so a sender only needs the
   recipient's public shielded address, not the recipient's spending secret.
 - The contract can persist optional encrypted note payloads alongside output
-  commitments. Those payloads are not proof-bound, so recipients must decrypt
-  and recompute the commitment before trusting them.
+  commitments. The current `v3` statement now also binds per-output payload
+  hashes into the proof so the on-chain payload bytes cannot drift from the
+  proving statement after the fact.
 - Wallet-side key material is now split between a spend key (`owner_secret`)
   and a viewing key. Optional extra viewers can be disclosed per output using
   the same encrypted payload channel without granting spend authority.
@@ -68,7 +69,7 @@ The contract exposes:
 - Public balances and shielded supply are tracked separately while keeping a
   total-supply invariant.
 - Proof-related field values use canonical BN254 field-element encodings.
-- The current shielded circuit family is `v2`, built around Merkle auth paths
+- The current shielded circuit family is `v3`, built around Merkle auth paths
   plus a chain-owned append frontier rather than whole-tree witnesses.
 - The default tree depth is now `20`, giving a capacity of `1,048,576` notes
   while keeping verifier cost flat and append updates `O(depth)`.
@@ -90,9 +91,10 @@ The contract exposes:
 - The package now has a first wallet-side proving and note-scanning path
   through `xian-zk`, including state snapshots, record sync, note selection,
   exact-withdraw planning, separated viewing keys, and a basic disclosed-viewer
-  path. It also now has operator-side random bundle + registry-manifest
-  generation, but it still lacks an MPC ceremony flow, a polished end-user
-  wallet interface, and a broader network-level viewing/disclosure policy.
+  path. It also now has operator-side bundle metadata and richer
+  registry-manifest generation, but it still lacks an MPC ceremony flow, a
+  polished end-user wallet interface, and a broader network-level
+  viewing/disclosure policy.
 - This contract is materially stronger than the earlier privacy-token
   experiments, but it is not yet a polished end-user privacy asset stack.
 
