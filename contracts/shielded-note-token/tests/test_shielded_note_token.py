@@ -1,10 +1,11 @@
-import json
+import tempfile
 import unittest
 from functools import lru_cache
 from pathlib import Path
 
 import pytest
 from contracting.client import ContractingClient
+from xian_runtime_types.time import Datetime
 
 pytest.importorskip("xian_zk")
 from xian_zk import (
@@ -13,14 +14,18 @@ from xian_zk import (
     ShieldedNote,
     ShieldedNoteProver,
     ShieldedOutput,
+    ShieldedRelayTransferProver,
+    ShieldedRelayTransferWallet,
     ShieldedTransferRequest,
     ShieldedWallet,
     ShieldedWithdrawRequest,
     asset_id_for_contract,
+    note_records_from_transactions,
     output_payload_hash,
     output_payload_hashes,
     recover_encrypted_notes,
     scan_notes,
+    shielded_relay_registry_manifest,
     tree_state,
     zero_root,
 )
@@ -200,10 +205,42 @@ def field(value: int) -> str:
     return f"0x{value:064x}"
 
 
+def indexed_tx(
+    function: str,
+    kwargs: dict[str, object],
+    *,
+    tx_index: int,
+    block_height: int = 1,
+):
+    return {
+        "tx_hash": f"TX-{block_height}-{tx_index}",
+        "block_height": block_height,
+        "tx_index": tx_index,
+        "success": True,
+        "created_at": f"2026-01-01T00:00:{block_height:02d}+00:00",
+        "payload": {
+            "sender": "alice",
+            "nonce": tx_index,
+            "contract": "con_shielded_note_token",
+            "function": function,
+            "kwargs": kwargs,
+        },
+    }
+
+
 class TestShieldedNoteToken(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.relay_prover = ShieldedRelayTransferProver.build_insecure_dev_bundle()
+        cls.relay_manifest = shielded_relay_registry_manifest(
+            cls.relay_prover,
+            artifact_contract_name="con_shielded_note_token",
+        )
+
     def setUp(self):
         self.fixture = load_fixture()
-        self.client = ContractingClient()
+        self._storage_home = tempfile.TemporaryDirectory()
+        self.client = ContractingClient(storage_home=Path(self._storage_home.name))
         self.client.flush()
 
         with ZK_REGISTRY_PATH.open() as registry_file:
@@ -232,6 +269,10 @@ class TestShieldedNoteToken(unittest.TestCase):
                 setup_mode="insecure-dev",
                 signer="sys",
             )
+        for entry in self.relay_manifest["registry_entries"]:
+            args = dict(entry)
+            args.pop("action", None)
+            self.registry.register_vk(**args, signer="sys")
 
         with CONTRACT_PATH.open() as contract_file:
             self.client.submit(
@@ -256,12 +297,18 @@ class TestShieldedNoteToken(unittest.TestCase):
             vk_id=self.fixture["verifying_keys"][2]["vk_id"],
             signer="sys",
         )
+        self.token.configure_vk(
+            action="relay_transfer",
+            vk_id=self.relay_manifest["configure_actions"][0]["vk_id"],
+            signer="sys",
+        )
 
         self.alice = "alice"
         self.bob = "bob"
 
     def tearDown(self):
         self.client.flush()
+        self._storage_home.cleanup()
 
     def assertSupply(self, total: int, public: int, shielded: int):
         self.assertEqual(
@@ -272,6 +319,68 @@ class TestShieldedNoteToken(unittest.TestCase):
                 "shielded_supply": shielded,
             },
         )
+
+    def fund_shielded_wallet(
+        self,
+        *,
+        wallet: ShieldedWallet,
+        amount: int,
+        signer: str,
+        rho: str,
+        blind: str,
+        block_height: int,
+    ):
+        prover = ShieldedNoteProver.build_insecure_dev_bundle()
+        note = ShieldedNote(
+            owner_secret=wallet.owner_secret,
+            amount=amount,
+            rho=rho,
+            blind=blind,
+        )
+        payload = note.to_output().encrypt_for(
+            asset_id=wallet.asset_id,
+            viewing_public_key=wallet.viewing_public_key,
+        )
+        commitments_before = []
+        note_count = self.token.get_note_count(signer="sys")
+        if note_count > 0:
+            commitments_before = self.token.list_note_commitments(
+                start=0,
+                limit=note_count,
+                signer="sys",
+            )
+        proof = prover.prove_deposit(
+            ShieldedDepositRequest(
+                asset_id=wallet.asset_id,
+                old_root=self.token.current_shielded_root(signer="sys"),
+                append_state=tree_state(commitments_before),
+                amount=amount,
+                outputs=[note.to_output()],
+                output_payload_hashes=output_payload_hashes([payload]),
+            )
+        )
+        result = self.token.deposit_shielded(
+            amount=amount,
+            old_root=proof.old_root,
+            output_commitments=proof.output_commitments,
+            proof_hex=proof.proof_hex,
+            output_payloads=[payload],
+            signer=signer,
+        )
+        tx = indexed_tx(
+            "deposit_shielded",
+            {
+                "amount": amount,
+                "old_root": proof.old_root,
+                "output_commitments": proof.output_commitments,
+                "proof_hex": proof.proof_hex,
+                "output_payloads": [payload],
+            },
+            tx_index=0,
+            block_height=block_height,
+        )
+        wallet.sync_transactions([tx])
+        return note, payload, proof, result, tx
 
     def run_real_flow(self):
         self.token.mint_public(amount=100, to=self.alice, signer="sys")
@@ -459,7 +568,7 @@ class TestShieldedNoteToken(unittest.TestCase):
             withdraw["expected_new_root"],
         )
 
-    def test_output_payloads_are_stored_and_listed(self):
+    def test_output_payloads_are_not_stored_but_hashes_are_listed(self):
         self.token.mint_public(amount=100, to=self.alice, signer="sys")
         prover = ShieldedNoteProver.build_insecure_dev_bundle()
         asset_id = self.token.asset_id(signer="sys")
@@ -501,7 +610,7 @@ class TestShieldedNoteToken(unittest.TestCase):
 
         self.assertEqual(
             self.token.get_note_payload(commitment=first_commitment, signer="sys"),
-            "0x1234",
+            None,
         )
         self.assertIsNone(
             self.token.get_note_payload(commitment=second_commitment, signer="sys")
@@ -510,7 +619,7 @@ class TestShieldedNoteToken(unittest.TestCase):
             self.token.get_commitment_info(commitment=first_commitment, signer="sys")[
                 "payload"
             ],
-            "0x1234",
+            None,
         )
         self.assertEqual(
             self.token.get_note_payload_hash(commitment=first_commitment, signer="sys"),
@@ -519,7 +628,7 @@ class TestShieldedNoteToken(unittest.TestCase):
 
         records = self.token.list_note_records(start=0, limit=2, signer="sys")
         self.assertEqual(records[0]["commitment"], first_commitment)
-        self.assertEqual(records[0]["payload"], "0x1234")
+        self.assertIsNone(records[0]["payload"])
         self.assertEqual(records[0]["payload_hash"], output_payload_hash("0x1234"))
         self.assertEqual(records[1]["commitment"], second_commitment)
         self.assertIsNone(records[1]["payload"])
@@ -696,15 +805,26 @@ class TestShieldedNoteToken(unittest.TestCase):
         )
         self.assertEqual(deposit_result["new_root"], deposit.expected_new_root)
 
-        records_after_deposit = self.token.list_note_records(
-            start=0,
-            limit=2,
-            signer="sys",
+        records_after_deposit = note_records_from_transactions(
+            [
+                indexed_tx(
+                    "deposit_shielded",
+                    {
+                        "amount": 70,
+                        "old_root": deposit.old_root,
+                        "output_commitments": deposit.output_commitments,
+                        "proof_hex": deposit.proof_hex,
+                        "output_payloads": deposit_payloads,
+                    },
+                    tx_index=0,
+                    block_height=1,
+                )
+            ]
         )
         recovered_after_deposit = recover_encrypted_notes(
             asset_id=asset_id,
-            commitments=[record["commitment"] for record in records_after_deposit],
-            payloads=[record["payload"] for record in records_after_deposit],
+            commitments=[record.commitment for record in records_after_deposit],
+            payloads=[record.payload for record in records_after_deposit],
             owner_secret=alice_keys.owner_secret,
             viewing_private_key=alice_keys.viewing_private_key,
         )
@@ -771,15 +891,38 @@ class TestShieldedNoteToken(unittest.TestCase):
         commitments_after_transfer = (
             deposit.output_commitments + transfer.output_commitments
         )
-        records_after_transfer = self.token.list_note_records(
-            start=0,
-            limit=len(commitments_after_transfer),
-            signer="sys",
+        records_after_transfer = note_records_from_transactions(
+            [
+                indexed_tx(
+                    "deposit_shielded",
+                    {
+                        "amount": 70,
+                        "old_root": deposit.old_root,
+                        "output_commitments": deposit.output_commitments,
+                        "proof_hex": deposit.proof_hex,
+                        "output_payloads": deposit_payloads,
+                    },
+                    tx_index=0,
+                    block_height=1,
+                ),
+                indexed_tx(
+                    "transfer_shielded",
+                    {
+                        "old_root": transfer.old_root,
+                        "input_nullifiers": transfer.input_nullifiers,
+                        "output_commitments": transfer.output_commitments,
+                        "proof_hex": transfer.proof_hex,
+                        "output_payloads": transfer_payloads,
+                    },
+                    tx_index=0,
+                    block_height=2,
+                ),
+            ]
         )
         recovered_for_bob = recover_encrypted_notes(
             asset_id=asset_id,
-            commitments=[record["commitment"] for record in records_after_transfer],
-            payloads=[record["payload"] for record in records_after_transfer],
+            commitments=[record.commitment for record in records_after_transfer],
+            payloads=[record.payload for record in records_after_transfer],
             owner_secret=bob_keys.owner_secret,
             viewing_private_key=bob_keys.viewing_private_key,
         )
@@ -924,8 +1067,21 @@ class TestShieldedNoteToken(unittest.TestCase):
         )
         self.assertEqual(deposit_result["new_root"], deposit.expected_new_root)
 
-        alice_wallet.sync_records(
-            self.token.list_note_records(start=0, limit=1, signer="sys")
+        alice_wallet.sync_transactions(
+            [
+                indexed_tx(
+                    "deposit_shielded",
+                    {
+                        "amount": 40,
+                        "old_root": deposit.old_root,
+                        "output_commitments": deposit.output_commitments,
+                        "proof_hex": deposit.proof_hex,
+                        "output_payloads": deposit_plan.output_payloads,
+                    },
+                    tx_index=0,
+                    block_height=1,
+                )
+            ]
         )
         self.assertEqual(alice_wallet.available_balance(), 40)
 
@@ -962,3 +1118,269 @@ class TestShieldedNoteToken(unittest.TestCase):
         )
         self.assertEqual(len(spent), 1)
         self.assertEqual(alice_wallet.available_balance(), 0)
+
+    @pytest.mark.slow
+    def test_relay_transfer_hides_sender_and_pays_relayer(self):
+        chain_id = "xian-local-1"
+        relay_expiry = Datetime(2026, 1, 1, 12, 30, 0)
+        relay_now = Datetime(2026, 1, 1, 12, 5, 0)
+        asset_id = self.token.asset_id(signer="sys")
+
+        self.assertEqual(
+            self.token.get_relay_proof_config(signer="sys")["circuit_family"],
+            "shielded_command_v4",
+        )
+        self.token.mint_public(amount=100, to=self.alice, signer="sys")
+        alice_wallet = ShieldedRelayTransferWallet.from_parts(
+            asset_id=asset_id,
+            owner_secret=field(701),
+            viewing_private_key="77" * 32,
+        )
+        bob_wallet = ShieldedRelayTransferWallet.from_parts(
+            asset_id=asset_id,
+            owner_secret=field(702),
+            viewing_private_key="88" * 32,
+        )
+
+        (
+            deposit_note,
+            deposit_payload,
+            deposit_proof,
+            deposit_result,
+            deposit_tx,
+        ) = self.fund_shielded_wallet(
+            wallet=alice_wallet,
+            amount=40,
+            signer=self.alice,
+            rho=field(7101),
+            blind=field(7201),
+            block_height=1,
+        )
+
+        plan = alice_wallet.build_relay_transfer(
+            recipient=bob_wallet.recipient,
+            amount=25,
+            relayer="relayer",
+            chain_id=chain_id,
+            fee=4,
+            expires_at=relay_expiry,
+            recipient_memo="invoice-25",
+            change_memo="change",
+        )
+        proof = self.relay_prover.prove_relay_transfer(plan.request)
+        relay_hashes = self.token.hash_relay_transfer(
+            input_nullifiers=proof.input_nullifiers,
+            relayer="relayer",
+            relayer_fee=4,
+            expires_at=relay_expiry,
+            signer="sys",
+            environment={"chain_id": chain_id},
+        )
+
+        self.assertEqual(proof.relay_binding, relay_hashes["relay_binding"])
+        self.assertEqual(proof.execution_tag, relay_hashes["execution_tag"])
+        self.assertEqual(deposit_result["new_root"], proof.old_root)
+
+        relay_result = self.token.relay_transfer_shielded(
+            old_root=proof.old_root,
+            input_nullifiers=proof.input_nullifiers,
+            output_commitments=proof.output_commitments,
+            proof_hex=proof.proof_hex,
+            relayer_fee=4,
+            expires_at=relay_expiry,
+            output_payloads=plan.output_payloads,
+            signer="relayer",
+            environment={"chain_id": chain_id, "now": relay_now},
+        )
+
+        self.assertEqual(relay_result["execution_id"], 0)
+        self.assertEqual(relay_result["output_count"], 2)
+        self.assertEqual(
+            self.token.balance_of(account="relayer", signer="sys"),
+            4,
+        )
+        self.assertEqual(
+            self.token.get_relay_execution_id_by_binding(
+                relay_binding=proof.relay_binding,
+                signer="sys",
+            ),
+            0,
+        )
+        self.assertEqual(
+            self.token.get_relay_execution_id_by_tag(
+                execution_tag=proof.execution_tag,
+                signer="sys",
+            ),
+            0,
+        )
+        self.assertEqual(
+            self.token.get_relay_execution_id_by_nullifier(
+                nullifier=proof.input_nullifiers[0],
+                signer="sys",
+            ),
+            0,
+        )
+        self.assertTrue(
+            self.token.is_nullifier_spent(
+                nullifier=proof.input_nullifiers[0],
+                signer="sys",
+            )
+        )
+        execution = self.token.get_relay_execution(execution_id=0, signer="sys")
+        self.assertEqual(execution["relayer"], "relayer")
+        self.assertEqual(execution["relay_binding"], proof.relay_binding)
+        self.assertEqual(execution["fee"], 4)
+        self.assertEqual(execution["input_count"], 1)
+        self.assertEqual(execution["output_count"], 2)
+        self.assertEqual(execution["old_root"], proof.old_root)
+        self.assertEqual(execution["new_root"], relay_result["new_root"])
+
+        relay_tx = indexed_tx(
+            "relay_transfer_shielded",
+            {
+                "old_root": proof.old_root,
+                "input_nullifiers": proof.input_nullifiers,
+                "output_commitments": proof.output_commitments,
+                "proof_hex": proof.proof_hex,
+                "relayer_fee": 4,
+                "expires_at": relay_expiry,
+                "output_payloads": plan.output_payloads,
+            },
+            tx_index=0,
+            block_height=2,
+        )
+
+        alice_recovered = ShieldedRelayTransferWallet.from_parts(
+            asset_id=asset_id,
+            owner_secret=alice_wallet.owner_secret,
+            viewing_private_key=alice_wallet.viewing_private_key,
+        )
+        bob_recovered = ShieldedRelayTransferWallet.from_parts(
+            asset_id=asset_id,
+            owner_secret=bob_wallet.owner_secret,
+            viewing_private_key=bob_wallet.viewing_private_key,
+        )
+        alice_recovered.sync_transactions([deposit_tx, relay_tx])
+        bob_recovered.sync_transactions([deposit_tx, relay_tx])
+        alice_recovered.refresh_spent_status(
+            lambda nullifier: self.token.is_nullifier_spent(
+                nullifier=nullifier,
+                signer="sys",
+            )
+        )
+
+        self.assertEqual(alice_recovered.available_balance(), 11)
+        self.assertEqual(bob_recovered.available_balance(), 25)
+        self.assertEqual(
+            self.token.get_note_payload_hash(
+                commitment=proof.output_commitments[0],
+                signer="sys",
+            ),
+            proof.output_payload_hashes[0],
+        )
+        self.assertEqual(
+            self.token.get_note_payload_hash(
+                commitment=proof.output_commitments[1],
+                signer="sys",
+            ),
+            proof.output_payload_hashes[1],
+        )
+        self.assertEqual(
+            self.token.get_note_payload(
+                commitment=proof.output_commitments[0],
+                signer="sys",
+            ),
+            None,
+        )
+        self.assertEqual(
+            self.token.balance_of(account=self.alice, signer="sys"),
+            60,
+        )
+        self.assertEqual(
+            self.token.balance_of(account=self.bob, signer="sys"),
+            0,
+        )
+        self.assertSupply(total=100, public=64, shielded=36)
+
+    @pytest.mark.slow
+    def test_relay_transfer_rejects_wrong_relayer_and_expiry(self):
+        chain_id = "xian-local-1"
+        relay_expiry = Datetime(2026, 1, 1, 12, 20, 0)
+        asset_id = self.token.asset_id(signer="sys")
+
+        self.token.mint_public(amount=50, to=self.alice, signer="sys")
+        alice_wallet = ShieldedRelayTransferWallet.from_parts(
+            asset_id=asset_id,
+            owner_secret=field(801),
+            viewing_private_key="99" * 32,
+        )
+        bob_wallet = ShieldedRelayTransferWallet.from_parts(
+            asset_id=asset_id,
+            owner_secret=field(802),
+            viewing_private_key="aa" * 32,
+        )
+        self.fund_shielded_wallet(
+            wallet=alice_wallet,
+            amount=30,
+            signer=self.alice,
+            rho=field(8101),
+            blind=field(8201),
+            block_height=1,
+        )
+        plan = alice_wallet.build_relay_transfer(
+            recipient=bob_wallet.recipient,
+            amount=20,
+            relayer="relayer",
+            chain_id=chain_id,
+            fee=3,
+            expires_at=relay_expiry,
+        )
+        proof = self.relay_prover.prove_relay_transfer(plan.request)
+
+        with self.assertRaises(AssertionError):
+            self.token.relay_transfer_shielded(
+                old_root=proof.old_root,
+                input_nullifiers=proof.input_nullifiers,
+                output_commitments=proof.output_commitments,
+                proof_hex=proof.proof_hex,
+                relayer_fee=3,
+                expires_at=relay_expiry,
+                output_payloads=plan.output_payloads,
+                signer="wrong-relayer",
+                environment={
+                    "chain_id": chain_id,
+                    "now": Datetime(2026, 1, 1, 12, 5, 0),
+                },
+            )
+        self.assertFalse(
+            self.token.is_nullifier_spent(
+                nullifier=proof.input_nullifiers[0],
+                signer="sys",
+            )
+        )
+
+        with self.assertRaises(AssertionError):
+            self.token.relay_transfer_shielded(
+                old_root=proof.old_root,
+                input_nullifiers=proof.input_nullifiers,
+                output_commitments=proof.output_commitments,
+                proof_hex=proof.proof_hex,
+                relayer_fee=3,
+                expires_at=relay_expiry,
+                output_payloads=plan.output_payloads,
+                signer="relayer",
+                environment={
+                    "chain_id": chain_id,
+                    "now": Datetime(2026, 1, 1, 12, 21, 0),
+                },
+            )
+        self.assertFalse(
+            self.token.is_nullifier_spent(
+                nullifier=proof.input_nullifiers[0],
+                signer="sys",
+            )
+        )
+        self.assertEqual(
+            self.token.balance_of(account="relayer", signer="sys"),
+            0,
+        )

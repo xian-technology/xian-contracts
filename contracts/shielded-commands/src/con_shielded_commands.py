@@ -580,14 +580,8 @@ def append_output_commitments(output_commitments: list, output_payloads: list):
 
     for index in range(len(output_commitments)):
         commitment = output_commitments[index]
-        note_metadata[commitment, "root"] = new_root
-        note_metadata[commitment, "created_at"] = now
         payload = output_payloads[index]
-        payload_hash = output_payload_hash(payload)
-        if payload == "":
-            payload = None
-        note_metadata[commitment, "payload"] = payload
-        note_metadata[commitment, "payload_hash"] = payload_hash
+        note_metadata[commitment, "payload_hash"] = output_payload_hash(payload)
 
     accept_root(new_root)
     return new_root
@@ -922,9 +916,9 @@ def get_commitment_info(commitment: str):
         return None
     return {
         "index": note_metadata[commitment, "index"],
-        "root": note_metadata[commitment, "root"],
-        "created_at": note_metadata[commitment, "created_at"],
-        "payload": note_metadata[commitment, "payload"],
+        "root": None,
+        "created_at": None,
+        "payload": None,
         "payload_hash": note_metadata[commitment, "payload_hash"],
     }
 
@@ -934,7 +928,7 @@ def get_note_payload(commitment: str):
     require_field_hex32("commitment", commitment)
     if note_exists[commitment] is not True:
         return None
-    return note_metadata[commitment, "payload"]
+    return None
 
 
 @export
@@ -1007,9 +1001,9 @@ def list_note_records(start: int = 0, limit: int = 64):
             {
                 "index": index,
                 "commitment": commitment,
-                "payload": note_metadata[commitment, "payload"],
+                "payload": None,
                 "payload_hash": note_metadata[commitment, "payload_hash"],
-                "created_at": note_metadata[commitment, "created_at"],
+                "created_at": None,
             }
         )
     return records
