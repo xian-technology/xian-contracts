@@ -343,10 +343,7 @@ def output_payload_hash(payload: str):
 
 
 def output_payload_hashes(output_payloads: list):
-    hashes = []
-    for payload in output_payloads:
-        hashes.append(output_payload_hash(payload))
-    return hashes
+    return zk.shielded_output_payload_hashes(output_payloads)
 
 
 def pad_field_values(values: list, size: int):
@@ -547,30 +544,21 @@ def verify_proof(action: str, proof_hex: str, public_inputs: list):
 def deposit_public_inputs(
     old_root: str, amount: int, commitments: list, payload_hashes: list
 ):
-    inputs = [
-        contract_asset_id(),
-        old_root,
-        u256_hex(amount),
-        u256_hex(len(commitments)),
-    ]
-    inputs.extend(pad_field_values(commitments, MAX_OUTPUT_COMMITMENTS))
-    inputs.extend(pad_field_values(payload_hashes, MAX_OUTPUT_COMMITMENTS))
-    return inputs
+    return zk.shielded_deposit_public_inputs(
+        ctx.this, old_root, amount, commitments, payload_hashes
+    )
 
 
 def transfer_public_inputs(
     old_root: str, nullifiers: list, commitments: list, payload_hashes: list
 ):
-    inputs = [
-        contract_asset_id(),
+    return zk.shielded_transfer_public_inputs(
+        ctx.this,
         old_root,
-        u256_hex(len(nullifiers)),
-        u256_hex(len(commitments)),
-    ]
-    inputs.extend(pad_field_values(nullifiers, MAX_INPUT_NULLIFIERS))
-    inputs.extend(pad_field_values(commitments, MAX_OUTPUT_COMMITMENTS))
-    inputs.extend(pad_field_values(payload_hashes, MAX_OUTPUT_COMMITMENTS))
-    return inputs
+        nullifiers,
+        commitments,
+        payload_hashes,
+    )
 
 
 def relay_transfer_public_inputs(
@@ -582,20 +570,17 @@ def relay_transfer_public_inputs(
     commitments: list,
     payload_hashes: list,
 ):
-    inputs = [
-        contract_asset_id(),
+    return zk.shielded_command_public_inputs(
+        ctx.this,
         old_root,
         relay_binding,
         execution_tag,
-        u256_hex(fee),
-        u256_hex(0),
-        u256_hex(len(nullifiers)),
-        u256_hex(len(commitments)),
-    ]
-    inputs.extend(pad_field_values(nullifiers, MAX_INPUT_NULLIFIERS))
-    inputs.extend(pad_field_values(commitments, MAX_OUTPUT_COMMITMENTS))
-    inputs.extend(pad_field_values(payload_hashes, MAX_OUTPUT_COMMITMENTS))
-    return inputs
+        fee,
+        0,
+        nullifiers,
+        commitments,
+        payload_hashes,
+    )
 
 
 def withdraw_public_inputs(
@@ -606,18 +591,15 @@ def withdraw_public_inputs(
     commitments: list,
     payload_hashes: list,
 ):
-    inputs = [
-        contract_asset_id(),
+    return zk.shielded_withdraw_public_inputs(
+        ctx.this,
         old_root,
-        u256_hex(amount),
-        recipient_input(recipient),
-        u256_hex(len(nullifiers)),
-        u256_hex(len(commitments)),
-    ]
-    inputs.extend(pad_field_values(nullifiers, MAX_INPUT_NULLIFIERS))
-    inputs.extend(pad_field_values(commitments, MAX_OUTPUT_COMMITMENTS))
-    inputs.extend(pad_field_values(payload_hashes, MAX_OUTPUT_COMMITMENTS))
-    return inputs
+        amount,
+        recipient,
+        nullifiers,
+        commitments,
+        payload_hashes,
+    )
 
 
 operator = Variable()
