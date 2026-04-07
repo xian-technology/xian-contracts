@@ -339,10 +339,7 @@ def require_output_payloads(output_payloads: list, expected_count: int):
 
 
 def output_payload_hash(payload: str):
-    if payload is None or payload == "":
-        return FIELD_ZERO_HEX
-    require_hex_blob("output payload", payload)
-    return field_hex_from_text(payload)
+    return zk.shielded_output_payload_hash(payload)
 
 
 def output_payload_hashes(output_payloads: list):
@@ -476,7 +473,7 @@ def emit_output_event_batch(
     action: str,
     start_index: int,
     output_commitments: list,
-    output_payloads: list,
+    payload_hashes: list,
     new_root: str,
 ):
     ShieldedOutputsCommitted(
@@ -486,15 +483,16 @@ def emit_output_event_batch(
             "note_index_start": start_index,
             "output_count": len(output_commitments),
             "commitments_blob": pack_field_values(output_commitments),
-            "payload_hashes_blob": pack_field_values(
-                output_payload_hashes(output_payloads)
-            ),
+            "payload_hashes_blob": pack_field_values(payload_hashes),
         }
     )
 
 
 def append_output_commitments(
-    output_commitments: list, output_payloads: list, *, action: str
+    output_commitments: list,
+    payload_hashes: list,
+    *,
+    action: str,
 ):
     if len(output_commitments) == 0:
         return current_root.get()
@@ -520,7 +518,7 @@ def append_output_commitments(
         action=action,
         start_index=start_index,
         output_commitments=output_commitments,
-        output_payloads=output_payloads,
+        payload_hashes=payload_hashes,
         new_root=new_root,
     )
     return new_root
@@ -1175,7 +1173,9 @@ def deposit_shielded(
     public_supply.set(public_supply.get() - amount)
     shielded_supply.set(shielded_supply.get() + amount)
     new_root = append_output_commitments(
-        output_commitments, output_payloads, action="deposit"
+        output_commitments,
+        payload_hashes,
+        action="deposit",
     )
     assert_supply_invariant()
 
@@ -1224,7 +1224,9 @@ def transfer_shielded(
 
     spend_nullifiers(input_nullifiers)
     new_root = append_output_commitments(
-        output_commitments, output_payloads, action="transfer"
+        output_commitments,
+        payload_hashes,
+        action="transfer",
     )
     assert_supply_invariant()
 
@@ -1293,7 +1295,9 @@ def relay_transfer_shielded(
 
     spend_nullifiers(input_nullifiers)
     new_root = append_output_commitments(
-        output_commitments, output_payloads, action="relay_transfer"
+        output_commitments,
+        payload_hashes,
+        action="relay_transfer",
     )
 
     if relayer_fee > 0:
@@ -1371,7 +1375,9 @@ def withdraw_shielded(
     public_supply.set(public_supply.get() + amount)
     shielded_supply.set(shielded_supply.get() - amount)
     new_root = append_output_commitments(
-        output_commitments, output_payloads, action="withdraw"
+        output_commitments,
+        payload_hashes,
+        action="withdraw",
     )
     assert_supply_invariant()
 

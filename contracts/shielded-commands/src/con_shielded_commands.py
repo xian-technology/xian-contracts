@@ -388,10 +388,7 @@ def require_output_payloads(output_payloads: list, expected_count: int):
 
 
 def output_payload_hash(payload: str):
-    if payload is None or payload == "":
-        return FIELD_ZERO_HEX
-    require_hex_blob("output payload", payload)
-    return field_hex_from_text(payload)
+    return zk.shielded_output_payload_hash(payload)
 
 
 def output_payload_hashes(output_payloads: list):
@@ -559,7 +556,7 @@ def emit_output_events(
     action: str,
     start_index: int,
     output_commitments: list,
-    output_payloads: list,
+    payload_hashes: list,
     new_root: str,
 ):
     for output_index in range(len(output_commitments)):
@@ -569,16 +566,17 @@ def emit_output_events(
                 "new_root": new_root,
                 "note_index": start_index + output_index,
                 "output_index": output_index,
-                "payload_hash": output_payload_hash(
-                    output_payloads[output_index]
-                ),
+                "payload_hash": payload_hashes[output_index],
                 "action": action,
             }
         )
 
 
 def append_output_commitments(
-    output_commitments: list, output_payloads: list, *, action: str
+    output_commitments: list,
+    payload_hashes: list,
+    *,
+    action: str,
 ):
     if len(output_commitments) == 0:
         return current_root.get()
@@ -608,7 +606,7 @@ def append_output_commitments(
         action=action,
         start_index=start_index,
         output_commitments=output_commitments,
-        output_payloads=output_payloads,
+        payload_hashes=payload_hashes,
         new_root=new_root,
     )
     return new_root
@@ -1260,7 +1258,9 @@ def deposit_shielded(
 
     escrow_balance.set(escrow_balance.get() + amount)
     new_root = append_output_commitments(
-        output_commitments, output_payloads, action="deposit"
+        output_commitments,
+        payload_hashes,
+        action="deposit",
     )
     assert_escrow_invariant(token)
     release_execution_lock()
@@ -1350,7 +1350,9 @@ def execute_command(
 
     spend_nullifiers(input_nullifiers)
     new_root = append_output_commitments(
-        output_commitments, output_payloads, action="command"
+        output_commitments,
+        payload_hashes,
+        action="command",
     )
     activate_execution_target(target_contract, public_amount)
 
@@ -1456,7 +1458,9 @@ def withdraw_shielded(
 
     spend_nullifiers(input_nullifiers)
     new_root = append_output_commitments(
-        output_commitments, output_payloads, action="withdraw"
+        output_commitments,
+        payload_hashes,
+        action="withdraw",
     )
     token.transfer(amount=amount, to=to)
 
