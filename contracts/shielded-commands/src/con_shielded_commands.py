@@ -276,13 +276,9 @@ def command_version_digest():
 
 def command_nullifier_digest_hex(input_nullifiers: list):
     require_nullifiers(input_nullifiers)
-    padded_nullifiers = pad_field_values(
-        input_nullifiers, MAX_INPUT_NULLIFIERS
+    return zk.shielded_command_nullifier_digest(
+        pad_field_values(input_nullifiers, MAX_INPUT_NULLIFIERS)
     )
-    values = []
-    for nullifier in padded_nullifiers:
-        values.append(field_int(nullifier))
-    return field_hex_from_int(mimc_hash_many_int(values))
 
 
 def command_binding_hex(
@@ -297,33 +293,25 @@ def command_binding_hex(
     expires_at = normalize_expires_at(expires_at)
     require_fee_amount(fee)
     require_public_amount(public_amount)
-    return field_hex_from_int(
-        mimc_hash_many_int(
-            [
-                field_int(command_nullifier_digest_hex(input_nullifiers)),
-                field_int(command_target_digest(target_contract)),
-                field_int(command_payload_digest(payload)),
-                field_int(command_relayer_digest(relayer)),
-                field_int(command_expiry_digest(expires_at)),
-                field_int(command_chain_digest()),
-                field_int(command_entrypoint_digest()),
-                field_int(command_version_digest()),
-                fee,
-                public_amount,
-            ]
-        )
+    return zk.shielded_command_binding(
+        command_nullifier_digest_hex(input_nullifiers),
+        command_target_digest(target_contract),
+        command_payload_digest(payload),
+        command_relayer_digest(relayer),
+        command_expiry_digest(expires_at),
+        command_chain_digest(),
+        command_entrypoint_digest(),
+        command_version_digest(),
+        fee,
+        public_amount,
     )
 
 
 def command_execution_tag_hex(input_nullifiers: list, command_binding: str):
     require_field_hex32("command_binding", command_binding)
-    return field_hex_from_int(
-        mimc_hash_many_int(
-            [
-                field_int(command_nullifier_digest_hex(input_nullifiers)),
-                field_int(command_binding),
-            ]
-        )
+    return zk.shielded_command_execution_tag(
+        command_nullifier_digest_hex(input_nullifiers),
+        command_binding,
     )
 
 
@@ -539,7 +527,6 @@ def append_single_commitment(commitment: str):
         current_index = current_index // 2
 
     note_exists[commitment] = True
-    note_metadata[commitment, "index"] = index
     note_commitments[index] = commitment
     note_count.set(index + 1)
     return current_hash
@@ -567,23 +554,63 @@ def accept_root(new_root: str):
     RootAccepted({"root": new_root, "index": index})
 
 
-def append_output_commitments(output_commitments: list, output_payloads: list):
+def emit_output_events(
+    *,
+    action: str,
+    start_index: int,
+    output_commitments: list,
+    output_payloads: list,
+    new_root: str,
+):
+    for output_index in range(len(output_commitments)):
+        ShieldedOutputCommitted(
+            {
+                "commitment": output_commitments[output_index],
+                "new_root": new_root,
+                "note_index": start_index + output_index,
+                "output_index": output_index,
+                "payload_hash": output_payload_hash(
+                    output_payloads[output_index]
+                ),
+                "action": action,
+            }
+        )
+
+
+def append_output_commitments(
+    output_commitments: list, output_payloads: list, *, action: str
+):
     if len(output_commitments) == 0:
         return current_root.get()
 
     assert note_count.get() + len(output_commitments) <= MAX_NOTE_LEAVES, (
         "Shielded note tree is full!"
     )
-    new_root = current_root.get()
-    for commitment in output_commitments:
-        new_root = append_single_commitment(commitment)
+    start_index = note_count.get()
+    for output_index in range(len(output_commitments)):
+        commitment = output_commitments[output_index]
+        assert note_exists[commitment] is not True, "Commitment already exists!"
+        note_exists[commitment] = True
+        note_commitments[start_index + output_index] = commitment
 
-    for index in range(len(output_commitments)):
-        commitment = output_commitments[index]
-        payload = output_payloads[index]
-        note_metadata[commitment, "payload_hash"] = output_payload_hash(payload)
+    next_state = zk.shielded_note_append_commitments(
+        start_index,
+        current_filled_subtrees(),
+        output_commitments,
+    )
+    for level in range(SHIELDED_TREE_DEPTH):
+        filled_subtrees[level] = next_state["filled_subtrees"][level]
+    note_count.set(next_state["note_count"])
+    new_root = next_state["root"]
 
     accept_root(new_root)
+    emit_output_events(
+        action=action,
+        start_index=start_index,
+        output_commitments=output_commitments,
+        output_payloads=output_payloads,
+        new_root=new_root,
+    )
     return new_root
 
 
@@ -699,17 +726,12 @@ accepted_roots = Hash(default_value=False)
 root_history = Hash()
 spent_nullifiers = Hash(default_value=False)
 note_exists = Hash(default_value=False)
-note_metadata = Hash()
 note_commitments = Hash()
 filled_subtrees = Hash()
 note_count = Variable()
 metadata = Hash()
 allowed_targets = Hash(default_value=False)
 relayers = Hash(default_value=False)
-executions = Hash()
-execution_by_nullifier = Hash()
-execution_by_binding = Hash()
-execution_by_tag = Hash()
 
 
 VkConfigured = LogEvent(
@@ -754,11 +776,15 @@ ShieldedCommandExecuted = LogEvent(
         "relayer": {"type": str, "idx": True},
         "target_contract": {"type": str, "idx": True},
         "nullifier_digest": {"type": str},
+        "execution_tag": {"type": str},
         "input_count": {"type": int},
         "command_binding": {"type": str},
         "fee": {"type": int},
         "public_amount": {"type": int},
+        "old_root": {"type": str},
         "new_root": {"type": str},
+        "output_count": {"type": int},
+        "expires_at": {"type": str},
     },
 )
 
@@ -772,6 +798,18 @@ ShieldedWithdraw = LogEvent(
         "new_root": {"type": str, "idx": True},
         "nullifier_count": {"type": int},
         "output_count": {"type": int},
+    },
+)
+
+ShieldedOutputCommitted = LogEvent(
+    event="ShieldedOutputCommitted",
+    params={
+        "commitment": {"type": str, "idx": True},
+        "new_root": {"type": str, "idx": True},
+        "note_index": {"type": int},
+        "output_index": {"type": int},
+        "payload_hash": {"type": str},
+        "action": {"type": str},
     },
 )
 
@@ -915,11 +953,11 @@ def get_commitment_info(commitment: str):
     if note_exists[commitment] is not True:
         return None
     return {
-        "index": note_metadata[commitment, "index"],
+        "index": None,
         "root": None,
         "created_at": None,
         "payload": None,
-        "payload_hash": note_metadata[commitment, "payload_hash"],
+        "payload_hash": None,
     }
 
 
@@ -936,7 +974,7 @@ def get_note_payload_hash(commitment: str):
     require_field_hex32("commitment", commitment)
     if note_exists[commitment] is not True:
         return None
-    return note_metadata[commitment, "payload_hash"]
+    return None
 
 
 @export
@@ -1002,7 +1040,7 @@ def list_note_records(start: int = 0, limit: int = 64):
                 "index": index,
                 "commitment": commitment,
                 "payload": None,
-                "payload_hash": note_metadata[commitment, "payload_hash"],
+                "payload_hash": None,
                 "created_at": None,
             }
         )
@@ -1053,47 +1091,25 @@ def get_execution_count():
 def get_execution(execution_id: int):
     assert isinstance(execution_id, int), "execution_id must be an integer!"
     assert 0 <= execution_id < execution_count.get(), "execution_id out of range!"
-    input_count = executions[execution_id, "input_count"]
-    input_nullifiers = []
-    for index in range(input_count):
-        input_nullifiers.append(executions[execution_id, "input_nullifier", index])
-    return {
-        "execution_id": execution_id,
-        "relayer": executions[execution_id, "relayer"],
-        "target_contract": executions[execution_id, "target_contract"],
-        "command_binding": executions[execution_id, "command_binding"],
-        "execution_tag": executions[execution_id, "execution_tag"],
-        "nullifier_digest": executions[execution_id, "nullifier_digest"],
-        "input_count": input_count,
-        "input_nullifiers": input_nullifiers,
-        "fee": executions[execution_id, "fee"],
-        "public_amount": executions[execution_id, "public_amount"],
-        "old_root": executions[execution_id, "old_root"],
-        "new_root": executions[execution_id, "new_root"],
-        "output_count": executions[execution_id, "output_count"],
-        "expires_at": str(executions[execution_id, "expires_at"])
-        if executions[execution_id, "expires_at"] is not None
-        else "",
-        "executed_at": str(executions[execution_id, "executed_at"]),
-    }
+    return None
 
 
 @export
 def get_execution_id_by_nullifier(nullifier: str):
     require_field_hex32("nullifier", nullifier)
-    return execution_by_nullifier[nullifier]
+    return None
 
 
 @export
 def get_execution_id_by_binding(command_binding: str):
     require_field_hex32("command_binding", command_binding)
-    return execution_by_binding[command_binding]
+    return None
 
 
 @export
 def get_execution_id_by_tag(execution_tag: str):
     require_field_hex32("execution_tag", execution_tag)
-    return execution_by_tag[execution_tag]
+    return None
 
 
 @export
@@ -1243,7 +1259,9 @@ def deposit_shielded(
     )
 
     escrow_balance.set(escrow_balance.get() + amount)
-    new_root = append_output_commitments(output_commitments, output_payloads)
+    new_root = append_output_commitments(
+        output_commitments, output_payloads, action="deposit"
+    )
     assert_escrow_invariant(token)
     release_execution_lock()
 
@@ -1311,8 +1329,6 @@ def execute_command(
     )
     execution_tag = command_execution_tag_hex(input_nullifiers, binding)
     nullifier_digest = command_nullifier_digest_hex(input_nullifiers)
-    assert execution_by_binding[binding] is None, "Command binding already executed."
-    assert execution_by_tag[execution_tag] is None, "Execution tag already used."
     public_inputs = command_public_inputs(
         old_root=old_root,
         command_binding=binding,
@@ -1333,7 +1349,9 @@ def execute_command(
     )
 
     spend_nullifiers(input_nullifiers)
-    new_root = append_output_commitments(output_commitments, output_payloads)
+    new_root = append_output_commitments(
+        output_commitments, output_payloads, action="command"
+    )
     activate_execution_target(target_contract, public_amount)
 
     module = importlib.import_module(target_contract)
@@ -1367,25 +1385,6 @@ def execute_command(
 
     execution_id = execution_count.get()
     execution_count.set(execution_id + 1)
-    executions[execution_id, "relayer"] = ctx.caller
-    executions[execution_id, "target_contract"] = target_contract
-    executions[execution_id, "command_binding"] = binding
-    executions[execution_id, "execution_tag"] = execution_tag
-    executions[execution_id, "nullifier_digest"] = nullifier_digest
-    executions[execution_id, "input_count"] = len(input_nullifiers)
-    for index in range(len(input_nullifiers)):
-        nullifier = input_nullifiers[index]
-        executions[execution_id, "input_nullifier", index] = nullifier
-        execution_by_nullifier[nullifier] = execution_id
-    execution_by_binding[binding] = execution_id
-    execution_by_tag[execution_tag] = execution_id
-    executions[execution_id, "fee"] = relayer_fee
-    executions[execution_id, "public_amount"] = public_amount
-    executions[execution_id, "old_root"] = old_root
-    executions[execution_id, "new_root"] = new_root
-    executions[execution_id, "output_count"] = len(output_commitments)
-    executions[execution_id, "expires_at"] = expires_at
-    executions[execution_id, "executed_at"] = now
     release_execution_lock()
 
     ShieldedCommandExecuted(
@@ -1394,11 +1393,17 @@ def execute_command(
             "relayer": ctx.caller,
             "target_contract": target_contract,
             "nullifier_digest": nullifier_digest,
+            "execution_tag": execution_tag,
             "input_count": len(input_nullifiers),
             "command_binding": binding,
             "fee": relayer_fee,
             "public_amount": public_amount,
+            "old_root": old_root,
             "new_root": new_root,
+            "output_count": len(output_commitments),
+            "expires_at": ""
+            if expires_at is None
+            else str(expires_at),
         }
     )
 
@@ -1450,7 +1455,9 @@ def withdraw_shielded(
     assert contract_balance_before >= amount, "Escrow balance is too low."
 
     spend_nullifiers(input_nullifiers)
-    new_root = append_output_commitments(output_commitments, output_payloads)
+    new_root = append_output_commitments(
+        output_commitments, output_payloads, action="withdraw"
+    )
     token.transfer(amount=amount, to=to)
 
     contract_balance_after = token.balance_of(ctx.this)

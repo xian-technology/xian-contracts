@@ -341,19 +341,11 @@ class TestShieldedNoteToken(unittest.TestCase):
             asset_id=wallet.asset_id,
             viewing_public_key=wallet.viewing_public_key,
         )
-        commitments_before = []
-        note_count = self.token.get_note_count(signer="sys")
-        if note_count > 0:
-            commitments_before = self.token.list_note_commitments(
-                start=0,
-                limit=note_count,
-                signer="sys",
-            )
         proof = prover.prove_deposit(
             ShieldedDepositRequest(
                 asset_id=wallet.asset_id,
                 old_root=self.token.current_shielded_root(signer="sys"),
-                append_state=tree_state(commitments_before),
+                append_state=self.token.get_tree_state(signer="sys"),
                 amount=amount,
                 outputs=[note.to_output()],
                 output_payload_hashes=output_payload_hashes([payload]),
@@ -551,17 +543,12 @@ class TestShieldedNoteToken(unittest.TestCase):
         )
         self.assertSupply(total=100, public=50, shielded=50)
         self.assertEqual(self.token.get_note_count(signer="sys"), 5)
-        self.assertEqual(
-            self.token.get_note_commitment(index=0, signer="sys"),
-            deposit["output_commitments"][0],
+        self.assertIsNone(
+            self.token.get_note_commitment(index=0, signer="sys")
         )
         self.assertEqual(
             self.token.list_note_commitments(start=1, limit=3, signer="sys"),
-            [
-                deposit["output_commitments"][1],
-                transfer["output_commitments"][0],
-                transfer["output_commitments"][1],
-            ],
+            [],
         )
         self.assertEqual(
             self.token.get_tree_state(signer="sys")["root"],
@@ -621,18 +608,35 @@ class TestShieldedNoteToken(unittest.TestCase):
             ],
             None,
         )
-        self.assertEqual(
-            self.token.get_note_payload_hash(commitment=first_commitment, signer="sys"),
-            output_payload_hash("0x1234"),
+        self.assertIsNone(
+            self.token.get_note_payload_hash(
+                commitment=first_commitment, signer="sys"
+            )
         )
 
-        records = self.token.list_note_records(start=0, limit=2, signer="sys")
-        self.assertEqual(records[0]["commitment"], first_commitment)
-        self.assertIsNone(records[0]["payload"])
-        self.assertEqual(records[0]["payload_hash"], output_payload_hash("0x1234"))
-        self.assertEqual(records[1]["commitment"], second_commitment)
-        self.assertIsNone(records[1]["payload"])
-        self.assertEqual(records[1]["payload_hash"], output_payload_hash(""))
+        self.assertEqual(
+            self.token.list_note_records(start=0, limit=2, signer="sys"),
+            [],
+        )
+
+        tx = indexed_tx(
+            "deposit_shielded",
+            {
+                "amount": 70,
+                "old_root": deposit.old_root,
+                "output_commitments": deposit.output_commitments,
+                "proof_hex": deposit.proof_hex,
+                "output_payloads": payloads,
+            },
+            tx_index=0,
+            block_height=1,
+        )
+        indexed_records = note_records_from_transactions([tx])
+        self.assertEqual(
+            indexed_records[0].payload_hash,
+            output_payload_hash("0x1234"),
+        )
+        self.assertEqual(indexed_records[1].payload_hash, output_payload_hash(""))
 
     def test_invalid_proof_reverts_without_state_change(self):
         self.token.mint_public(amount=100, to=self.alice, signer="sys")
@@ -1199,41 +1203,13 @@ class TestShieldedNoteToken(unittest.TestCase):
             self.token.balance_of(account="relayer", signer="sys"),
             4,
         )
-        self.assertEqual(
-            self.token.get_relay_execution_id_by_binding(
-                relay_binding=proof.relay_binding,
-                signer="sys",
-            ),
-            0,
-        )
-        self.assertEqual(
-            self.token.get_relay_execution_id_by_tag(
-                execution_tag=proof.execution_tag,
-                signer="sys",
-            ),
-            0,
-        )
-        self.assertEqual(
-            self.token.get_relay_execution_id_by_nullifier(
-                nullifier=proof.input_nullifiers[0],
-                signer="sys",
-            ),
-            0,
-        )
         self.assertTrue(
             self.token.is_nullifier_spent(
                 nullifier=proof.input_nullifiers[0],
                 signer="sys",
             )
         )
-        execution = self.token.get_relay_execution(execution_id=0, signer="sys")
-        self.assertEqual(execution["relayer"], "relayer")
-        self.assertEqual(execution["relay_binding"], proof.relay_binding)
-        self.assertEqual(execution["fee"], 4)
-        self.assertEqual(execution["input_count"], 1)
-        self.assertEqual(execution["output_count"], 2)
-        self.assertEqual(execution["old_root"], proof.old_root)
-        self.assertEqual(execution["new_root"], relay_result["new_root"])
+        self.assertEqual(self.token.get_relay_execution_count(signer="sys"), 1)
 
         relay_tx = indexed_tx(
             "relay_transfer_shielded",
@@ -1271,19 +1247,17 @@ class TestShieldedNoteToken(unittest.TestCase):
 
         self.assertEqual(alice_recovered.available_balance(), 11)
         self.assertEqual(bob_recovered.available_balance(), 25)
-        self.assertEqual(
+        self.assertIsNone(
             self.token.get_note_payload_hash(
                 commitment=proof.output_commitments[0],
                 signer="sys",
-            ),
-            proof.output_payload_hashes[0],
+            )
         )
-        self.assertEqual(
+        self.assertIsNone(
             self.token.get_note_payload_hash(
                 commitment=proof.output_commitments[1],
                 signer="sys",
-            ),
-            proof.output_payload_hashes[1],
+            )
         )
         self.assertEqual(
             self.token.get_note_payload(

@@ -421,12 +421,11 @@ class TestShieldedCommands(unittest.TestCase):
             command_proof.output_payload_hashes,
             output_payload_hashes([command_payload]),
         )
-        self.assertEqual(
+        self.assertIsNone(
             self.commands.get_note_payload_hash(
                 commitment=command_proof.output_commitments[0],
                 signer="sys",
-            ),
-            command_proof.output_payload_hashes[0],
+            )
         )
         for input_nullifier in command_proof.input_nullifiers:
             self.assertTrue(
@@ -435,34 +434,7 @@ class TestShieldedCommands(unittest.TestCase):
                     signer="sys",
                 )
             )
-            self.assertEqual(
-                self.commands.get_execution_id_by_nullifier(
-                    nullifier=input_nullifier,
-                    signer="sys",
-                ),
-                0,
-            )
-        execution = self.commands.get_execution(execution_id=0, signer="sys")
-        self.assertEqual(execution["target_contract"], "con_shielded_target")
-        self.assertEqual(execution["relayer"], self.relayer)
-        self.assertEqual(execution["fee"], 7)
-        self.assertEqual(execution["nullifier_digest"], command_hashes["nullifier_digest"])
-        self.assertEqual(execution["input_count"], 2)
-        self.assertEqual(execution["input_nullifiers"], command_proof.input_nullifiers)
-        self.assertEqual(
-            self.commands.get_execution_id_by_binding(
-                command_binding=command_proof.command_binding,
-                signer="sys",
-            ),
-            0,
-        )
-        self.assertEqual(
-            self.commands.get_execution_id_by_tag(
-                execution_tag=command_proof.execution_tag,
-                signer="sys",
-            ),
-            0,
-        )
+        self.assertEqual(self.commands.get_execution_count(signer="sys"), 1)
 
         commitments_after_command, command_inputs = self._scan_inputs([command_change])
         withdraw_payload = withdraw_change.to_output().encrypt_for(
@@ -769,10 +741,7 @@ class TestShieldedCommands(unittest.TestCase):
             5,
         )
         self.assertEqual(self.commands.get_escrow_balance(signer="sys"), 23)
-        execution = self.commands.get_execution(execution_id=0, signer="sys")
-        self.assertEqual(execution["target_contract"], "con_public_spend_target")
-        self.assertEqual(execution["public_amount"], 12)
-        self.assertEqual(execution["fee"], 5)
+        self.assertEqual(self.commands.get_execution_count(signer="sys"), 1)
 
 
 if __name__ == "__main__":
