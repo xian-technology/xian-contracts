@@ -23,6 +23,7 @@ def seed():
     metadata['token_name'] = 'Currency'
     metadata['token_symbol'] = 'CUR'
     metadata['token_logo_url'] = ''
+    metadata['token_logo_svg'] = ''
     metadata['token_website'] = ''
     metadata['operator'] = ctx.caller
 

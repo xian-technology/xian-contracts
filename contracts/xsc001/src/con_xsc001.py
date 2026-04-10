@@ -15,6 +15,7 @@ REQUIRED_METADATA = (
     "token_name",
     "token_symbol",
     "token_logo_url",
+    "token_logo_svg",
     "token_website",
 )
 

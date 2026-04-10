@@ -226,6 +226,7 @@ def seed():
     metadata['token_name'] = "REFLECT TOKEN"
     metadata['token_symbol'] = "RFT"
     metadata['token_logo_url'] = ""
+    metadata['token_logo_svg'] = ""
     metadata['token_website'] = ""
     metadata['operator'] = ctx.caller
 
