@@ -6,6 +6,7 @@ from xian_runtime_types.decimal import ContractingDecimal
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACT_PATH = ROOT / "src" / "con_reflection_token.py"
+XSC001_PATH = ROOT.parent / "xsc001" / "src" / "con_xsc001.py"
 INITIAL_SUPPLY = ContractingDecimal("100000000")
 TOLERANCE = ContractingDecimal("0.00001")
 
@@ -17,8 +18,11 @@ class TestReflectionToken(unittest.TestCase):
 
         with CONTRACT_PATH.open() as f:
             self.client.submit(f.read(), name="con_reflection_token")
+        with XSC001_PATH.open() as f:
+            self.client.submit(f.read(), name="con_xsc001")
 
         self.token = self.client.get_contract("con_reflection_token")
+        self.standard = self.client.get_contract("con_xsc001")
         self.operator = "sys"
         self.alice = "a" * 64
         self.bob = "b" * 64
@@ -128,6 +132,57 @@ class TestReflectionToken(unittest.TestCase):
             self.token.balance_of(address=self.burn, signer=self.operator),
             "2",
         )
+
+    def test_token_passes_xsc001_checker(self):
+        self.assertTrue(
+            self.standard.is_XSC001(
+                contract="con_reflection_token",
+                signer=self.operator,
+            )
+        )
+
+    def test_get_metadata_tracks_total_supply_after_fee_burn(self):
+        metadata_before = self.token.get_metadata(signer=self.operator)
+        self.assertEqual(metadata_before["token_name"], "REFLECT TOKEN")
+        self.assertEqual(metadata_before["token_symbol"], "RFT")
+        self.assertEqual(metadata_before["total_supply"], INITIAL_SUPPLY)
+
+        self.token.transfer(amount=1000, to=self.alice, signer=self.operator)
+        self.token.set_fee_target(address=self.bob, enabled=True, signer=self.operator)
+        self.token.transfer(amount=100, to=self.bob, signer=self.alice)
+
+        metadata_after = self.token.get_metadata(signer=self.operator)
+        self.assertAmountEqual(metadata_after["total_supply"], "99999998")
+        self.assertAmountEqual(
+            metadata_after["total_supply"],
+            self.token.get_total_supply(signer=self.operator),
+        )
+
+    def test_change_operator_rotates_metadata_authority(self):
+        with self.assertRaises(AssertionError):
+            self.token.change_metadata(
+                key="token_website",
+                value="https://alice.invalid",
+                signer=self.alice,
+            )
+
+        self.token.change_operator(new_operator=self.alice, signer=self.operator)
+
+        with self.assertRaises(AssertionError):
+            self.token.change_metadata(
+                key="token_website",
+                value="https://sys.invalid",
+                signer=self.operator,
+            )
+
+        self.token.change_metadata(
+            key="token_website",
+            value="https://alice.invalid",
+            signer=self.alice,
+        )
+        metadata = self.token.get_metadata(signer=self.operator)
+        self.assertEqual(metadata["operator"], self.alice)
+        self.assertEqual(metadata["token_website"], "https://alice.invalid")
 
 
 if __name__ == "__main__":

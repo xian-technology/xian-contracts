@@ -13,6 +13,11 @@ Fee-on-transfer reflection token designed to work with the Xian DEX.
 
 ## Notes
 
+- The contract now exposes the canonical XSC001 allowance hash as
+  `approvals`, while still keeping a legacy `approved` hash in sync for
+  compatibility with older local assumptions.
+- It now passes the package XSC001 interface checker and exposes
+  `get_metadata()` for app/tooling reads.
 - Fees only apply when either party is marked as a fee target.
 - DEX integration requires setting the relevant pair-facing address or addresses
   as fee targets before liquidity is added.
@@ -33,6 +38,9 @@ Fee-on-transfer reflection token designed to work with the Xian DEX.
 - The helper contract path is validated too. It now expects an explicit
   absolute deadline and still needs wider slippage than a normal token because
   reflection fees affect the pair-facing leg.
+- `operator` and `total_supply` are treated as managed metadata fields. Supply
+  metadata stays in sync with fee burns, and metadata authority can be rotated
+  with `change_operator(...)`.
 
 ## Validation
 
