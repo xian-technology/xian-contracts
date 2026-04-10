@@ -14,8 +14,15 @@ MAX_NOTE_AMOUNT = 2**64 - 1
 MAX_ROOT_HISTORY_WINDOW = 64
 MAX_COMMITMENT_PAGE_SIZE = 128
 MAX_OUTPUT_PAYLOAD_BYTES = 4096
+LIST_BLOB_DELIMITER = "|"
 NOTE_CIRCUIT_FAMILY = "shielded_note_v3"
 NOTE_STATEMENT_VERSION = "3"
+RELAY_CIRCUIT_FAMILY = "shielded_command_v4"
+RELAY_STATEMENT_VERSION = "4"
+RELAY_TARGET = "shielded-note-relay-transfer"
+RELAY_PAYLOAD = "transfer"
+RELAY_ENTRYPOINT = "relay_transfer_shielded"
+RELAY_BINDING_VERSION = "shielded-note-relay-v1"
 
 
 def require_positive_amount(amount: int):
@@ -27,6 +34,11 @@ def require_positive_amount(amount: int):
 def require_shielded_amount(amount: int):
     require_positive_amount(amount)
     assert amount <= MAX_NOTE_AMOUNT, "Amount exceeds shielded note limit!"
+
+
+def require_fee_amount(amount: int):
+    assert isinstance(amount, int), "Fee must be an integer!"
+    assert 0 <= amount <= MAX_NOTE_AMOUNT, "Fee is out of range!"
 
 
 def u256_hex(value: int):
@@ -180,8 +192,88 @@ def recipient_input(recipient: str):
     return field_hex_from_text(recipient)
 
 
+def normalize_expires_at(expires_at=None):
+    if expires_at is None:
+        return None
+    if isinstance(expires_at, str) and expires_at == "":
+        return None
+    return expires_at
+
+
+def relay_target_digest():
+    return field_hex_from_text(RELAY_TARGET)
+
+
+def relay_payload_digest():
+    return field_hex_from_text(RELAY_PAYLOAD)
+
+
+def relay_relayer_digest(relayer: str):
+    assert isinstance(relayer, str) and relayer != "", "relayer must be non-empty."
+    return field_hex_from_text(relayer)
+
+
+def relay_chain_digest():
+    assert isinstance(chain_id, str) and chain_id != "", (
+        "chain_id must be a non-empty string."
+    )
+    return field_hex_from_text(chain_id)
+
+
+def relay_expiry_digest(expires_at=None):
+    expires_at = normalize_expires_at(expires_at)
+    if expires_at is None:
+        return FIELD_ZERO_HEX
+    return field_hex_from_text(str(expires_at))
+
+
+def relay_entrypoint_digest():
+    return field_hex_from_text(RELAY_ENTRYPOINT)
+
+
+def relay_version_digest():
+    return field_hex_from_text(RELAY_BINDING_VERSION)
+
+
+def relay_nullifier_digest_hex(input_nullifiers: list):
+    require_nullifiers(input_nullifiers)
+    return zk.shielded_command_nullifier_digest(
+        pad_field_values(input_nullifiers, MAX_INPUT_NULLIFIERS)
+    )
+
+
+def relay_binding_hex(
+    input_nullifiers: list,
+    relayer: str,
+    fee: int = 0,
+    expires_at=None,
+):
+    expires_at = normalize_expires_at(expires_at)
+    require_fee_amount(fee)
+    return zk.shielded_command_binding(
+        relay_nullifier_digest_hex(input_nullifiers),
+        relay_target_digest(),
+        relay_payload_digest(),
+        relay_relayer_digest(relayer),
+        relay_expiry_digest(expires_at),
+        relay_chain_digest(),
+        relay_entrypoint_digest(),
+        relay_version_digest(),
+        fee,
+        0,
+    )
+
+
+def relay_execution_tag_hex(input_nullifiers: list, relay_binding: str):
+    require_field_hex32("relay_binding", relay_binding)
+    return zk.shielded_command_execution_tag(
+        relay_nullifier_digest_hex(input_nullifiers),
+        relay_binding,
+    )
+
+
 def require_action(action: str):
-    assert action in {"deposit", "transfer", "withdraw"}, (
+    assert action in {"deposit", "transfer", "withdraw", "relay_transfer"}, (
         "Unsupported action!"
     )
 
@@ -192,7 +284,7 @@ def require_root(root: str, field_name: str):
 
 def require_accepted_root(root: str, field_name: str):
     require_root(root, field_name)
-    assert accepted_roots[root] is True, field_name + " is not accepted!"
+    assert root in current_recent_roots(), field_name + " is not accepted!"
 
 
 def require_list_size(values: list, minimum: int, maximum: int, label: str):
@@ -247,17 +339,11 @@ def require_output_payloads(output_payloads: list, expected_count: int):
 
 
 def output_payload_hash(payload: str):
-    if payload is None or payload == "":
-        return FIELD_ZERO_HEX
-    require_hex_blob("output payload", payload)
-    return field_hex_from_text(payload)
+    return zk.shielded_output_payload_hash(payload)
 
 
 def output_payload_hashes(output_payloads: list):
-    hashes = []
-    for payload in output_payloads:
-        hashes.append(output_payload_hash(payload))
-    return hashes
+    return zk.shielded_output_payload_hashes(output_payloads)
 
 
 def pad_field_values(values: list, size: int):
@@ -298,22 +384,50 @@ def require_operator():
     assert ctx.caller == operator.get(), "Only operator!"
 
 
+def empty_frontier():
+    return [FIELD_ZERO_HEX] * SHIELDED_TREE_DEPTH
+
+
 def current_filled_subtrees():
-    values = []
-    for level in range(SHIELDED_TREE_DEPTH):
-        subtree = filled_subtrees[level]
-        if subtree is None:
-            subtree = FIELD_ZERO_HEX
-        values.append(subtree)
+    stored = frontier_state.get()
+    if stored is None:
+        return empty_frontier()
+    values = list(stored)
+    if len(values) < SHIELDED_TREE_DEPTH:
+        values.extend([FIELD_ZERO_HEX] * (SHIELDED_TREE_DEPTH - len(values)))
+    return values[:SHIELDED_TREE_DEPTH]
+
+
+def current_recent_roots():
+    stored = recent_roots.get()
+    if stored is None:
+        return [ZERO_ROOT]
+    values = list(stored)
+    if len(values) == 0:
+        return [ZERO_ROOT]
     return values
 
 
-def append_single_commitment(commitment: str):
+def pack_field_values(values: list):
+    if len(values) == 0:
+        return ""
+    packed = ""
+    for index in range(len(values)):
+        value = values[index]
+        assert isinstance(value, str), "Packed field values must be strings!"
+        assert LIST_BLOB_DELIMITER not in value, (
+            "Packed field contains reserved delimiter!"
+        )
+        if index > 0:
+            packed += LIST_BLOB_DELIMITER
+        packed += value
+    return packed
+
+
+def append_single_commitment(frontier: list, index: int, commitment: str):
     require_field_hex32("output commitment", commitment)
     assert commitment != FIELD_ZERO_HEX, "Output commitment must be non-zero!"
     assert note_exists[commitment] is not True, "Commitment already exists!"
-
-    index = note_count.get()
     assert index < MAX_NOTE_LEAVES, "Shielded note tree is full!"
 
     current_hash = commitment
@@ -321,67 +435,89 @@ def append_single_commitment(commitment: str):
 
     for level in range(SHIELDED_TREE_DEPTH):
         if current_index % 2 == 0:
-            filled_subtrees[level] = current_hash
+            frontier[level] = current_hash
             current_hash = mimc_hash_pair_hex(current_hash, ZERO_HASHES[level])
         else:
-            left_hash = filled_subtrees[level]
+            left_hash = frontier[level]
             if left_hash is None:
                 left_hash = FIELD_ZERO_HEX
             current_hash = mimc_hash_pair_hex(left_hash, current_hash)
         current_index = current_index // 2
 
     note_exists[commitment] = True
-    note_metadata[commitment, "index"] = index
-    note_commitments[index] = commitment
-    note_count.set(index + 1)
-    return current_hash
+    return frontier, index + 1, current_hash
 
 
 def accept_root(new_root: str):
     require_root(new_root, "new_root")
-    assert accepted_roots[new_root] is not True, "Root already accepted!"
+    roots = current_recent_roots()
+    assert new_root not in roots, "Root already accepted!"
 
     index = root_count.get()
     window = root_history_window.get()
 
-    accepted_roots[new_root] = True
-    root_history[index] = new_root
+    roots.append(new_root)
+    if len(roots) > window:
+        roots = roots[-window:]
 
-    if index >= window:
-        stale_index = index - window
-        stale_root = root_history[stale_index]
-        if stale_root is not None:
-            accepted_roots[stale_root] = None
-            root_history[stale_index] = None
-
+    recent_roots.set(roots)
     current_root.set(new_root)
     root_count.set(index + 1)
-    RootAccepted({"root": new_root, "index": index})
 
 
-def append_output_commitments(output_commitments: list, output_payloads: list):
+def emit_output_event_batch(
+    *,
+    action: str,
+    start_index: int,
+    output_commitments: list,
+    payload_hashes: list,
+    new_root: str,
+):
+    ShieldedOutputsCommitted(
+        {
+            "new_root": new_root,
+            "action": action,
+            "note_index_start": start_index,
+            "output_count": len(output_commitments),
+            "commitments_blob": pack_field_values(output_commitments),
+            "payload_hashes_blob": pack_field_values(payload_hashes),
+        }
+    )
+
+
+def append_output_commitments(
+    output_commitments: list,
+    payload_hashes: list,
+    *,
+    action: str,
+):
     if len(output_commitments) == 0:
         return current_root.get()
 
     assert note_count.get() + len(output_commitments) <= MAX_NOTE_LEAVES, (
         "Shielded note tree is full!"
     )
-    new_root = current_root.get()
+    start_index = note_count.get()
     for commitment in output_commitments:
-        new_root = append_single_commitment(commitment)
+        assert note_exists[commitment] is not True, "Commitment already exists!"
+        note_exists[commitment] = True
 
-    for index in range(len(output_commitments)):
-        commitment = output_commitments[index]
-        note_metadata[commitment, "root"] = new_root
-        note_metadata[commitment, "created_at"] = now
-        payload = output_payloads[index]
-        payload_hash = output_payload_hash(payload)
-        if payload == "":
-            payload = None
-        note_metadata[commitment, "payload"] = payload
-        note_metadata[commitment, "payload_hash"] = payload_hash
-
+    next_state = zk.shielded_note_append_commitments(
+        start_index,
+        current_filled_subtrees(),
+        output_commitments,
+    )
+    new_root = next_state["root"]
+    frontier_state.set(next_state["filled_subtrees"])
+    note_count.set(next_state["note_count"])
     accept_root(new_root)
+    emit_output_event_batch(
+        action=action,
+        start_index=start_index,
+        output_commitments=output_commitments,
+        payload_hashes=payload_hashes,
+        new_root=new_root,
+    )
     return new_root
 
 
@@ -408,30 +544,43 @@ def verify_proof(action: str, proof_hex: str, public_inputs: list):
 def deposit_public_inputs(
     old_root: str, amount: int, commitments: list, payload_hashes: list
 ):
-    inputs = [
-        contract_asset_id(),
-        old_root,
-        u256_hex(amount),
-        u256_hex(len(commitments)),
-    ]
-    inputs.extend(pad_field_values(commitments, MAX_OUTPUT_COMMITMENTS))
-    inputs.extend(pad_field_values(payload_hashes, MAX_OUTPUT_COMMITMENTS))
-    return inputs
+    return zk.shielded_deposit_public_inputs(
+        ctx.this, old_root, amount, commitments, payload_hashes
+    )
 
 
 def transfer_public_inputs(
     old_root: str, nullifiers: list, commitments: list, payload_hashes: list
 ):
-    inputs = [
-        contract_asset_id(),
+    return zk.shielded_transfer_public_inputs(
+        ctx.this,
         old_root,
-        u256_hex(len(nullifiers)),
-        u256_hex(len(commitments)),
-    ]
-    inputs.extend(pad_field_values(nullifiers, MAX_INPUT_NULLIFIERS))
-    inputs.extend(pad_field_values(commitments, MAX_OUTPUT_COMMITMENTS))
-    inputs.extend(pad_field_values(payload_hashes, MAX_OUTPUT_COMMITMENTS))
-    return inputs
+        nullifiers,
+        commitments,
+        payload_hashes,
+    )
+
+
+def relay_transfer_public_inputs(
+    old_root: str,
+    relay_binding: str,
+    execution_tag: str,
+    fee: int,
+    nullifiers: list,
+    commitments: list,
+    payload_hashes: list,
+):
+    return zk.shielded_command_public_inputs(
+        ctx.this,
+        old_root,
+        relay_binding,
+        execution_tag,
+        fee,
+        0,
+        nullifiers,
+        commitments,
+        payload_hashes,
+    )
 
 
 def withdraw_public_inputs(
@@ -442,18 +591,15 @@ def withdraw_public_inputs(
     commitments: list,
     payload_hashes: list,
 ):
-    inputs = [
-        contract_asset_id(),
+    return zk.shielded_withdraw_public_inputs(
+        ctx.this,
         old_root,
-        u256_hex(amount),
-        recipient_input(recipient),
-        u256_hex(len(nullifiers)),
-        u256_hex(len(commitments)),
-    ]
-    inputs.extend(pad_field_values(nullifiers, MAX_INPUT_NULLIFIERS))
-    inputs.extend(pad_field_values(commitments, MAX_OUTPUT_COMMITMENTS))
-    inputs.extend(pad_field_values(payload_hashes, MAX_OUTPUT_COMMITMENTS))
-    return inputs
+        amount,
+        recipient,
+        nullifiers,
+        commitments,
+        payload_hashes,
+    )
 
 
 operator = Variable()
@@ -463,18 +609,16 @@ shielded_supply = Variable()
 root_history_window = Variable()
 root_count = Variable()
 current_root = Variable()
+relay_execution_count = Variable()
+recent_roots = Variable()
+frontier_state = Variable()
 
 balances = Hash(default_value=0)
 approvals = Hash(default_value=0)
 vk_ids = Hash()
 vk_hashes = Hash()
-accepted_roots = Hash(default_value=False)
-root_history = Hash()
 spent_nullifiers = Hash(default_value=False)
 note_exists = Hash(default_value=False)
-note_metadata = Hash()
-note_commitments = Hash()
-filled_subtrees = Hash()
 note_count = Variable()
 metadata = Hash()
 
@@ -511,14 +655,6 @@ PublicTransfer = LogEvent(
     },
 )
 
-RootAccepted = LogEvent(
-    event="RootAccepted",
-    params={
-        "root": {"type": str, "idx": True},
-        "index": {"type": int},
-    },
-)
-
 ShieldedDeposit = LogEvent(
     event="ShieldedDeposit",
     params={
@@ -541,6 +677,23 @@ ShieldedTransfer = LogEvent(
     },
 )
 
+ShieldedRelayTransfer = LogEvent(
+    event="ShieldedRelayTransfer",
+    params={
+        "execution_id": {"type": int, "idx": True},
+        "relayer": {"type": str, "idx": True},
+        "relay_binding": {"type": str},
+        "execution_tag": {"type": str},
+        "nullifier_digest": {"type": str},
+        "old_root": {"type": str},
+        "new_root": {"type": str, "idx": True},
+        "nullifier_count": {"type": int},
+        "output_count": {"type": int},
+        "fee": {"type": int},
+        "expires_at": {"type": str},
+    },
+)
+
 ShieldedWithdraw = LogEvent(
     event="ShieldedWithdraw",
     params={
@@ -551,6 +704,18 @@ ShieldedWithdraw = LogEvent(
         "new_root": {"type": str, "idx": True},
         "nullifier_count": {"type": int},
         "output_count": {"type": int},
+    },
+)
+
+ShieldedOutputsCommitted = LogEvent(
+    event="ShieldedOutputsCommitted",
+    params={
+        "new_root": {"type": str, "idx": True},
+        "action": {"type": str},
+        "note_index_start": {"type": int},
+        "output_count": {"type": int},
+        "commitments_blob": {"type": str},
+        "payload_hashes_blob": {"type": str},
     },
 )
 
@@ -581,8 +746,9 @@ def seed(
     root_history_window.set(root_window_size)
     root_count.set(1)
     current_root.set(ZERO_ROOT)
-    accepted_roots[ZERO_ROOT] = True
-    root_history[0] = ZERO_ROOT
+    relay_execution_count.set(0)
+    recent_roots.set([ZERO_ROOT])
+    frontier_state.set(empty_frontier())
     note_count.set(0)
     metadata["token_name"] = token_name
     metadata["token_symbol"] = token_symbol
@@ -661,9 +827,24 @@ def get_proof_config():
 
 
 @export
+def get_relay_proof_config():
+    return {
+        "circuit_family": RELAY_CIRCUIT_FAMILY,
+        "statement_version": RELAY_STATEMENT_VERSION,
+        "tree_depth": SHIELDED_TREE_DEPTH,
+        "leaf_capacity": MAX_NOTE_LEAVES,
+        "max_inputs": MAX_INPUT_NULLIFIERS,
+        "max_outputs": MAX_OUTPUT_COMMITMENTS,
+        "max_note_amount": MAX_NOTE_AMOUNT,
+        "zero_root": ZERO_ROOT,
+        "root_history_window": root_history_window.get(),
+    }
+
+
+@export
 def is_root_accepted(root: str):
     require_root(root, "root")
-    return accepted_roots[root] is True
+    return root in current_recent_roots()
 
 
 @export
@@ -684,11 +865,11 @@ def get_commitment_info(commitment: str):
     if note_exists[commitment] is not True:
         return None
     return {
-        "index": note_metadata[commitment, "index"],
-        "root": note_metadata[commitment, "root"],
-        "created_at": note_metadata[commitment, "created_at"],
-        "payload": note_metadata[commitment, "payload"],
-        "payload_hash": note_metadata[commitment, "payload_hash"],
+        "index": None,
+        "root": None,
+        "created_at": None,
+        "payload": None,
+        "payload_hash": None,
     }
 
 
@@ -697,7 +878,7 @@ def get_note_payload(commitment: str):
     require_field_hex32("commitment", commitment)
     if note_exists[commitment] is not True:
         return None
-    return note_metadata[commitment, "payload"]
+    return None
 
 
 @export
@@ -705,7 +886,7 @@ def get_note_payload_hash(commitment: str):
     require_field_hex32("commitment", commitment)
     if note_exists[commitment] is not True:
         return None
-    return note_metadata[commitment, "payload_hash"]
+    return None
 
 
 @export
@@ -726,7 +907,7 @@ def get_note_count():
 def get_note_commitment(index: int):
     assert isinstance(index, int), "index must be an integer!"
     assert 0 <= index < note_count.get(), "index out of range!"
-    return note_commitments[index]
+    return None
 
 
 @export
@@ -743,10 +924,7 @@ def list_note_commitments(start: int = 0, limit: int = 64):
     if end > total:
         end = total
 
-    commitments = []
-    for index in range(start, end):
-        commitments.append(note_commitments[index])
-    return commitments
+    return []
 
 
 @export
@@ -763,19 +941,39 @@ def list_note_records(start: int = 0, limit: int = 64):
     if end > total:
         end = total
 
-    records = []
-    for index in range(start, end):
-        commitment = note_commitments[index]
-        records.append(
-            {
-                "index": index,
-                "commitment": commitment,
-                "payload": note_metadata[commitment, "payload"],
-                "payload_hash": note_metadata[commitment, "payload_hash"],
-                "created_at": note_metadata[commitment, "created_at"],
-            }
-        )
-    return records
+    return []
+
+
+@export
+def get_relay_execution_count():
+    return relay_execution_count.get()
+
+
+@export
+def get_relay_execution_id_by_binding(relay_binding: str):
+    require_field_hex32("relay_binding", relay_binding)
+    return None
+
+
+@export
+def get_relay_execution_id_by_tag(execution_tag: str):
+    require_field_hex32("execution_tag", execution_tag)
+    return None
+
+
+@export
+def get_relay_execution_id_by_nullifier(nullifier: str):
+    require_field_hex32("nullifier", nullifier)
+    return None
+
+
+@export
+def get_relay_execution(execution_id: int):
+    assert isinstance(execution_id, int), "execution_id must be an integer!"
+    assert 0 <= execution_id < relay_execution_count.get(), (
+        "execution_id out of range!"
+    )
+    return None
 
 
 @export
@@ -858,10 +1056,15 @@ def configure_vk(action: str, vk_id: str):
         "Unknown or inactive verifying key!"
     )
     assert info["deprecated"] is not True, "Verifying key is deprecated!"
-    assert info["circuit_family"] == NOTE_CIRCUIT_FAMILY, (
+    expected_circuit_family = NOTE_CIRCUIT_FAMILY
+    expected_statement_version = NOTE_STATEMENT_VERSION
+    if action == "relay_transfer":
+        expected_circuit_family = RELAY_CIRCUIT_FAMILY
+        expected_statement_version = RELAY_STATEMENT_VERSION
+    assert info["circuit_family"] == expected_circuit_family, (
         "Verifying key circuit family mismatch!"
     )
-    assert info["statement_version"] == NOTE_STATEMENT_VERSION, (
+    assert info["statement_version"] == expected_statement_version, (
         "Verifying key statement version mismatch!"
     )
     assert info["tree_depth"] == SHIELDED_TREE_DEPTH, (
@@ -898,6 +1101,29 @@ def mint_public(amount: int, to: str):
 
 
 @export
+def hash_relay_transfer(
+    input_nullifiers: list,
+    relayer: str,
+    relayer_fee: int = 0,
+    expires_at: datetime.datetime = None,
+):
+    require_nullifiers(input_nullifiers)
+    require_fee_amount(relayer_fee)
+    expires_at = normalize_expires_at(expires_at)
+    binding = relay_binding_hex(
+        input_nullifiers=input_nullifiers,
+        relayer=relayer,
+        fee=relayer_fee,
+        expires_at=expires_at,
+    )
+    return {
+        "nullifier_digest": relay_nullifier_digest_hex(input_nullifiers),
+        "relay_binding": binding,
+        "execution_tag": relay_execution_tag_hex(input_nullifiers, binding),
+    }
+
+
+@export
 def deposit_shielded(
     amount: int,
     old_root: str,
@@ -928,7 +1154,11 @@ def deposit_shielded(
     balances[ctx.caller] -= amount
     public_supply.set(public_supply.get() - amount)
     shielded_supply.set(shielded_supply.get() + amount)
-    new_root = append_output_commitments(output_commitments, output_payloads)
+    new_root = append_output_commitments(
+        output_commitments,
+        payload_hashes,
+        action="deposit",
+    )
     assert_supply_invariant()
 
     ShieldedDeposit(
@@ -975,7 +1205,11 @@ def transfer_shielded(
     verify_proof("transfer", proof_hex, public_inputs)
 
     spend_nullifiers(input_nullifiers)
-    new_root = append_output_commitments(output_commitments, output_payloads)
+    new_root = append_output_commitments(
+        output_commitments,
+        payload_hashes,
+        action="transfer",
+    )
     assert_supply_invariant()
 
     ShieldedTransfer(
@@ -992,6 +1226,96 @@ def transfer_shielded(
         "new_root": new_root,
         "nullifier_count": len(input_nullifiers),
         "output_count": len(output_commitments),
+    }
+
+
+@export
+def relay_transfer_shielded(
+    old_root: str,
+    input_nullifiers: list,
+    output_commitments: list,
+    proof_hex: str,
+    relayer_fee: int = 0,
+    expires_at: datetime.datetime = None,
+    output_payloads: list = None,
+):
+    require_accepted_root(old_root, "old_root")
+    require_nullifiers(input_nullifiers)
+    require_commitments(output_commitments, 1)
+    require_fee_amount(relayer_fee)
+    expires_at = normalize_expires_at(expires_at)
+    output_payloads = require_output_payloads(
+        output_payloads, len(output_commitments)
+    )
+    payload_hashes = output_payload_hashes(output_payloads)
+    assert note_count.get() + len(output_commitments) <= MAX_NOTE_LEAVES, (
+        "Shielded note tree is full!"
+    )
+
+    if expires_at is not None:
+        assert now <= expires_at, "Relayed transfer has expired."
+
+    relay_binding = relay_binding_hex(
+        input_nullifiers=input_nullifiers,
+        relayer=ctx.caller,
+        fee=relayer_fee,
+        expires_at=expires_at,
+    )
+    execution_tag = relay_execution_tag_hex(input_nullifiers, relay_binding)
+    nullifier_digest = relay_nullifier_digest_hex(input_nullifiers)
+
+    public_inputs = relay_transfer_public_inputs(
+        old_root=old_root,
+        relay_binding=relay_binding,
+        execution_tag=execution_tag,
+        fee=relayer_fee,
+        nullifiers=input_nullifiers,
+        commitments=output_commitments,
+        payload_hashes=payload_hashes,
+    )
+    verify_proof("relay_transfer", proof_hex, public_inputs)
+
+    spend_nullifiers(input_nullifiers)
+    new_root = append_output_commitments(
+        output_commitments,
+        payload_hashes,
+        action="relay_transfer",
+    )
+
+    if relayer_fee > 0:
+        balances[ctx.caller] += relayer_fee
+        public_supply.set(public_supply.get() + relayer_fee)
+        shielded_supply.set(shielded_supply.get() - relayer_fee)
+
+    assert_supply_invariant()
+
+    execution_id = relay_execution_count.get()
+    relay_execution_count.set(execution_id + 1)
+
+    ShieldedRelayTransfer(
+        {
+            "execution_id": execution_id,
+            "relayer": ctx.caller,
+            "relay_binding": relay_binding,
+            "execution_tag": execution_tag,
+            "nullifier_digest": nullifier_digest,
+            "old_root": old_root,
+            "new_root": new_root,
+            "nullifier_count": len(input_nullifiers),
+            "output_count": len(output_commitments),
+            "fee": relayer_fee,
+            "expires_at": ""
+            if expires_at is None
+            else str(expires_at),
+        }
+    )
+
+    return {
+        "execution_id": execution_id,
+        "new_root": new_root,
+        "nullifier_count": len(input_nullifiers),
+        "output_count": len(output_commitments),
+        "relayer_fee": relayer_fee,
     }
 
 
@@ -1032,7 +1356,11 @@ def withdraw_shielded(
     balances[to] += amount
     public_supply.set(public_supply.get() + amount)
     shielded_supply.set(shielded_supply.get() - amount)
-    new_root = append_output_commitments(output_commitments, output_payloads)
+    new_root = append_output_commitments(
+        output_commitments,
+        payload_hashes,
+        action="withdraw",
+    )
     assert_supply_invariant()
 
     ShieldedWithdraw(

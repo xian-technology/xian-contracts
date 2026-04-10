@@ -1,3 +1,4 @@
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -13,6 +14,7 @@ from xian_zk import (
     ShieldedKeyBundle,
     ShieldedNote,
     ShieldedWithdrawRequest,
+    note_records_from_transactions,
     output_payload_hashes,
     scan_notes,
     tree_state,
@@ -85,6 +87,29 @@ def transfer_from(amount: int, to: str, main_account: str):
     return amount
 """
 
+
+def indexed_tx(
+    function: str,
+    kwargs: dict[str, object],
+    *,
+    tx_index: int,
+    block_height: int = 1,
+):
+    return {
+        "tx_hash": f"TX-{block_height}-{tx_index}",
+        "block_height": block_height,
+        "tx_index": tx_index,
+        "success": True,
+        "created_at": f"2026-01-01T00:00:{block_height:02d}+00:00",
+        "payload": {
+            "sender": "alice",
+            "nonce": tx_index,
+            "contract": "con_shielded_commands",
+            "function": function,
+            "kwargs": kwargs,
+        },
+    }
+
 TARGET_CODE = """
 counter = Variable()
 labels = Hash(default_value="")
@@ -153,7 +178,8 @@ class TestShieldedCommands(unittest.TestCase):
         cls.registry_manifest = cls.prover.registry_manifest()
 
     def setUp(self):
-        self.client = ContractingClient()
+        self._storage_home = tempfile.TemporaryDirectory()
+        self.client = ContractingClient(storage_home=Path(self._storage_home.name))
         self.client.flush()
 
         with ZK_REGISTRY_PATH.open() as registry_file:
@@ -235,6 +261,7 @@ class TestShieldedCommands(unittest.TestCase):
 
     def tearDown(self):
         self.client.flush()
+        self._storage_home.cleanup()
 
     def _environment(self, when: Datetime):
         return {"now": when, "chain_id": self.chain_id}
@@ -319,12 +346,12 @@ class TestShieldedCommands(unittest.TestCase):
             asset_id=self.asset_id,
             viewing_public_key=self.alice_keys.viewing_public_key,
         )
-        self._deposit_note(
+        deposit_proof_a, _ = self._deposit_note(
             deposit_note_a,
             signer=self.alice,
             payloads=[deposit_payload_a],
         )
-        _, deposit_result = self._deposit_note(
+        deposit_proof_b, deposit_result = self._deposit_note(
             deposit_note_b,
             signer=self.alice,
             payloads=[deposit_payload_b],
@@ -395,12 +422,11 @@ class TestShieldedCommands(unittest.TestCase):
             command_proof.output_payload_hashes,
             output_payload_hashes([command_payload]),
         )
-        self.assertEqual(
+        self.assertIsNone(
             self.commands.get_note_payload_hash(
                 commitment=command_proof.output_commitments[0],
                 signer="sys",
-            ),
-            command_proof.output_payload_hashes[0],
+            )
         )
         for input_nullifier in command_proof.input_nullifiers:
             self.assertTrue(
@@ -409,34 +435,7 @@ class TestShieldedCommands(unittest.TestCase):
                     signer="sys",
                 )
             )
-            self.assertEqual(
-                self.commands.get_execution_id_by_nullifier(
-                    nullifier=input_nullifier,
-                    signer="sys",
-                ),
-                0,
-            )
-        execution = self.commands.get_execution(execution_id=0, signer="sys")
-        self.assertEqual(execution["target_contract"], "con_shielded_target")
-        self.assertEqual(execution["relayer"], self.relayer)
-        self.assertEqual(execution["fee"], 7)
-        self.assertEqual(execution["nullifier_digest"], command_hashes["nullifier_digest"])
-        self.assertEqual(execution["input_count"], 2)
-        self.assertEqual(execution["input_nullifiers"], command_proof.input_nullifiers)
-        self.assertEqual(
-            self.commands.get_execution_id_by_binding(
-                command_binding=command_proof.command_binding,
-                signer="sys",
-            ),
-            0,
-        )
-        self.assertEqual(
-            self.commands.get_execution_id_by_tag(
-                execution_tag=command_proof.execution_tag,
-                signer="sys",
-            ),
-            0,
-        )
+        self.assertEqual(self.commands.get_execution_count(signer="sys"), 1)
 
         commitments_after_command, command_inputs = self._scan_inputs([command_change])
         withdraw_payload = withdraw_change.to_output().encrypt_for(
@@ -469,17 +468,71 @@ class TestShieldedCommands(unittest.TestCase):
         self.assertEqual(withdraw_result["new_root"], self.commands.current_shielded_root(signer="sys"))
         self.assertEqual(self.token.balance_of(address=self.bob, signer="sys"), 20)
         self.assertEqual(self.commands.get_escrow_balance(signer="sys"), 43)
-        records = self.commands.list_note_records(
-            start=0,
-            limit=self.commands.get_note_count(signer="sys"),
-            signer="sys",
+        records = note_records_from_transactions(
+            [
+                indexed_tx(
+                    "deposit_shielded",
+                    {
+                        "amount": deposit_note_a.amount,
+                        "old_root": deposit_proof_a.old_root,
+                        "output_commitments": deposit_proof_a.output_commitments,
+                        "proof_hex": deposit_proof_a.proof_hex,
+                        "output_payloads": [deposit_payload_a],
+                    },
+                    tx_index=0,
+                    block_height=1,
+                ),
+                indexed_tx(
+                    "deposit_shielded",
+                    {
+                        "amount": deposit_note_b.amount,
+                        "old_root": deposit_proof_b.old_root,
+                        "output_commitments": deposit_proof_b.output_commitments,
+                        "proof_hex": deposit_proof_b.proof_hex,
+                        "output_payloads": [deposit_payload_b],
+                    },
+                    tx_index=0,
+                    block_height=2,
+                ),
+                indexed_tx(
+                    "execute_command",
+                    {
+                        "target_contract": "con_shielded_target",
+                        "old_root": command_proof.old_root,
+                        "input_nullifiers": command_proof.input_nullifiers,
+                        "output_commitments": command_proof.output_commitments,
+                        "proof_hex": command_proof.proof_hex,
+                        "relayer_fee": 7,
+                        "public_amount": 0,
+                        "payload": {"increment": 4, "label": "hidden"},
+                        "expires_at": Datetime(2026, 1, 1, 12, 30, 0),
+                        "output_payloads": [command_payload],
+                    },
+                    tx_index=0,
+                    block_height=3,
+                ),
+                indexed_tx(
+                    "withdraw_shielded",
+                    {
+                        "amount": 20,
+                        "to": self.bob,
+                        "old_root": withdraw_proof.old_root,
+                        "input_nullifiers": withdraw_proof.input_nullifiers,
+                        "output_commitments": withdraw_proof.output_commitments,
+                        "proof_hex": withdraw_proof.proof_hex,
+                        "output_payloads": [withdraw_payload],
+                    },
+                    tx_index=0,
+                    block_height=4,
+                ),
+            ]
         )
-        self.assertEqual(records[0]["payload"], deposit_payload_a)
-        self.assertEqual(records[1]["payload"], deposit_payload_b)
-        self.assertEqual(records[2]["payload"], command_payload)
-        self.assertEqual(records[3]["payload"], withdraw_payload)
+        self.assertEqual(records[0].payload, deposit_payload_a)
+        self.assertEqual(records[1].payload, deposit_payload_b)
+        self.assertEqual(records[2].payload, command_payload)
+        self.assertEqual(records[3].payload, withdraw_payload)
         self.assertEqual(
-            records[3]["payload_hash"],
+            records[3].payload_hash,
             withdraw_proof.output_payload_hashes[0],
         )
 
@@ -689,10 +742,7 @@ class TestShieldedCommands(unittest.TestCase):
             5,
         )
         self.assertEqual(self.commands.get_escrow_balance(signer="sys"), 23)
-        execution = self.commands.get_execution(execution_id=0, signer="sys")
-        self.assertEqual(execution["target_contract"], "con_public_spend_target")
-        self.assertEqual(execution["public_amount"], 12)
-        self.assertEqual(execution["fee"], 5)
+        self.assertEqual(self.commands.get_execution_count(signer="sys"), 1)
 
 
 if __name__ == "__main__":
