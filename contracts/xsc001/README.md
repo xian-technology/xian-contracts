@@ -18,6 +18,9 @@ Interface checker for XSC001-style fungible token contracts.
 - It matches the current XSC001 reference implementation and token factory:
   `balances`, `approvals`, `metadata`, `change_metadata`, `transfer`,
   `approve`, `transfer_from`, and `balance_of(address)`.
+- It requires the canonical token metadata fields:
+  `token_name`, `token_symbol`, `token_logo_url`, `token_logo_svg`, and
+  `token_website`.
 - It does not require `metadata["operator"]`; the canonical implementation
   stores operator authority in a separate `Variable()`.
 - It checks interface shape and core metadata presence; it does not prove

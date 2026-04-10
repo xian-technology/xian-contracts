@@ -41,6 +41,7 @@ def seed():
     metadata["token_name"] = "Fee Token"
     metadata["token_symbol"] = "FEE"
     metadata["token_logo_url"] = ""
+    metadata["token_logo_svg"] = ""
     metadata["token_website"] = ""
 
 

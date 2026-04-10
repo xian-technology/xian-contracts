@@ -18,6 +18,7 @@ def seed():
     metadata['token_name'] = 'Valid Token'
     metadata['token_symbol'] = 'VT'
     metadata['token_logo_url'] = ''
+    metadata['token_logo_svg'] = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"><rect width="1" height="1"/></svg>'
     metadata['token_website'] = ''
     metadata['total_supply'] = balances[ctx.caller]
     operator.set(ctx.caller)
