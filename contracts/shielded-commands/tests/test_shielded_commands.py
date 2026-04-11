@@ -110,6 +110,7 @@ def indexed_tx(
         },
     }
 
+
 TARGET_CODE = """
 counter = Variable()
 labels = Hash(default_value="")
@@ -179,7 +180,9 @@ class TestShieldedCommands(unittest.TestCase):
 
     def setUp(self):
         self._storage_home = tempfile.TemporaryDirectory()
-        self.client = ContractingClient(storage_home=Path(self._storage_home.name))
+        self.client = ContractingClient(
+            storage_home=Path(self._storage_home.name)
+        )
         self.client.flush()
 
         with ZK_REGISTRY_PATH.open() as registry_file:
@@ -238,7 +241,9 @@ class TestShieldedCommands(unittest.TestCase):
             enabled=True,
             signer="sys",
         )
-        self.commands.set_relayer(account=self.relayer, enabled=True, signer="sys")
+        self.commands.set_relayer(
+            account=self.relayer, enabled=True, signer="sys"
+        )
         self.commands.set_relayer(
             account=self.alt_relayer,
             enabled=True,
@@ -356,7 +361,10 @@ class TestShieldedCommands(unittest.TestCase):
             signer=self.alice,
             payloads=[deposit_payload_b],
         )
-        self.assertEqual(deposit_result["new_root"], self.commands.current_shielded_root(signer="sys"))
+        self.assertEqual(
+            deposit_result["new_root"],
+            self.commands.current_shielded_root(signer="sys"),
+        )
         self.assertEqual(self.commands.get_escrow_balance(signer="sys"), 70)
 
         commitments_after_deposit, deposit_inputs = self._scan_inputs(
@@ -393,8 +401,12 @@ class TestShieldedCommands(unittest.TestCase):
             signer="sys",
             environment={"chain_id": self.chain_id},
         )
-        self.assertEqual(command_hashes["command_binding"], command_proof.command_binding)
-        self.assertEqual(command_hashes["execution_tag"], command_proof.execution_tag)
+        self.assertEqual(
+            command_hashes["command_binding"], command_proof.command_binding
+        )
+        self.assertEqual(
+            command_hashes["execution_tag"], command_proof.execution_tag
+        )
 
         command_result = self.commands.execute_command(
             target_contract="con_shielded_target",
@@ -437,7 +449,9 @@ class TestShieldedCommands(unittest.TestCase):
             )
         self.assertEqual(self.commands.get_execution_count(signer="sys"), 1)
 
-        commitments_after_command, command_inputs = self._scan_inputs([command_change])
+        commitments_after_command, command_inputs = self._scan_inputs(
+            [command_change]
+        )
         withdraw_payload = withdraw_change.to_output().encrypt_for(
             asset_id=self.asset_id,
             viewing_public_key=self.alice_keys.viewing_public_key,
@@ -465,8 +479,13 @@ class TestShieldedCommands(unittest.TestCase):
             environment=self._environment(Datetime(2026, 1, 1, 12, 10, 0)),
         )
 
-        self.assertEqual(withdraw_result["new_root"], self.commands.current_shielded_root(signer="sys"))
-        self.assertEqual(self.token.balance_of(address=self.bob, signer="sys"), 20)
+        self.assertEqual(
+            withdraw_result["new_root"],
+            self.commands.current_shielded_root(signer="sys"),
+        )
+        self.assertEqual(
+            self.token.balance_of(address=self.bob, signer="sys"), 20
+        )
         self.assertEqual(self.commands.get_escrow_balance(signer="sys"), 43)
         records = note_records_from_transactions(
             [
@@ -551,7 +570,9 @@ class TestShieldedCommands(unittest.TestCase):
         )
 
         _, deposit_result = self._deposit_note(deposit_note, signer=self.alice)
-        commitments_after_deposit, deposit_inputs = self._scan_inputs([deposit_note])
+        commitments_after_deposit, deposit_inputs = self._scan_inputs(
+            [deposit_note]
+        )
         command_request = ShieldedCommandRequest(
             asset_id=self.asset_id,
             old_root=deposit_result["new_root"],
@@ -627,7 +648,9 @@ class TestShieldedCommands(unittest.TestCase):
         )
 
         _, deposit_result = self._deposit_note(deposit_note, signer=self.alice)
-        commitments_after_deposit, deposit_inputs = self._scan_inputs([deposit_note])
+        commitments_after_deposit, deposit_inputs = self._scan_inputs(
+            [deposit_note]
+        )
         command_request = ShieldedCommandRequest(
             asset_id=self.asset_id,
             old_root=deposit_result["new_root"],
@@ -686,7 +709,9 @@ class TestShieldedCommands(unittest.TestCase):
         )
 
         _, deposit_result = self._deposit_note(deposit_note, signer=self.alice)
-        commitments_after_deposit, deposit_inputs = self._scan_inputs([deposit_note])
+        commitments_after_deposit, deposit_inputs = self._scan_inputs(
+            [deposit_note]
+        )
         command_request = ShieldedCommandRequest(
             asset_id=self.asset_id,
             old_root=deposit_result["new_root"],
@@ -715,8 +740,12 @@ class TestShieldedCommands(unittest.TestCase):
             signer="sys",
             environment={"chain_id": self.chain_id},
         )
-        self.assertEqual(command_hashes["command_binding"], command_proof.command_binding)
-        self.assertEqual(command_hashes["execution_tag"], command_proof.execution_tag)
+        self.assertEqual(
+            command_hashes["command_binding"], command_proof.command_binding
+        )
+        self.assertEqual(
+            command_hashes["execution_tag"], command_proof.execution_tag
+        )
 
         command_result = self.commands.execute_command(
             target_contract="con_public_spend_target",
@@ -736,7 +765,9 @@ class TestShieldedCommands(unittest.TestCase):
         self.assertEqual(command_result["result"]["recipient"], self.bob)
         self.assertEqual(self.spend_target.info()["spent"], 12)
         self.assertEqual(self.spend_target.info()["recipient"], self.bob)
-        self.assertEqual(self.token.balance_of(address=self.bob, signer="sys"), 12)
+        self.assertEqual(
+            self.token.balance_of(address=self.bob, signer="sys"), 12
+        )
         self.assertEqual(
             self.token.balance_of(address=self.relayer, signer="sys"),
             5,

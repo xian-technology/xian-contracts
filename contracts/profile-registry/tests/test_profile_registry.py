@@ -39,8 +39,12 @@ class TestProfileRegistry(unittest.TestCase):
 
         self.assertEqual(profile["account"], self.alice)
         self.assertEqual(profile["username"], "alice")
-        self.assertEqual(self.registry.resolve_username(username="alice"), self.alice)
-        self.assertEqual(self.registry.resolve_username(username="ALICE"), self.alice)
+        self.assertEqual(
+            self.registry.resolve_username(username="alice"), self.alice
+        )
+        self.assertEqual(
+            self.registry.resolve_username(username="ALICE"), self.alice
+        )
 
     def test_channel_management_and_custom_field_cleanup(self):
         self.register(self.alice, "alice")
@@ -59,7 +63,9 @@ class TestProfileRegistry(unittest.TestCase):
             environment={"now": self.now},
         )
 
-        profile = self.registry.get_profile(account=self.alice, signer=self.alice)
+        profile = self.registry.get_profile(
+            account=self.alice, signer=self.alice
+        )
         self.assertEqual(profile["custom_fields"], {})
 
         self.registry.create_channel(
@@ -81,15 +87,21 @@ class TestProfileRegistry(unittest.TestCase):
             environment={"now": self.now},
         )
 
-        channel = self.registry.get_channel(channel_name="GENERAL", signer=self.bob)
+        channel = self.registry.get_channel(
+            channel_name="GENERAL", signer=self.bob
+        )
         self.assertEqual(channel["channel_name"], "general")
         self.assertEqual(channel["owner"], self.alice)
         self.assertEqual(channel["members"], [self.alice, self.carol])
         self.assertFalse(
-            self.registry.is_channel_member(channel_name="general", account="BOB")
+            self.registry.is_channel_member(
+                channel_name="general", account="BOB"
+            )
         )
         self.assertTrue(
-            self.registry.is_channel_member(channel_name="general", account=self.carol)
+            self.registry.is_channel_member(
+                channel_name="general", account=self.carol
+            )
         )
 
         self.registry.delete_channel(

@@ -65,7 +65,9 @@ class TestReflectionToken(unittest.TestCase):
         self.token.transfer(amount=1000, to=self.alice, signer=self.operator)
         self.token.transfer(amount=1000, to=self.dex, signer=self.operator)
         self.token.exclude_from_rewards(address=self.dex, signer=self.operator)
-        self.token.set_fee_target(address=self.dex, enabled=True, signer=self.operator)
+        self.token.set_fee_target(
+            address=self.dex, enabled=True, signer=self.operator
+        )
 
         self.token.transfer(amount=100, to=self.dex, signer=self.alice)
 
@@ -73,9 +75,15 @@ class TestReflectionToken(unittest.TestCase):
             address=self.operator,
             signer=self.operator,
         )
-        alice_balance = self.token.balance_of(address=self.alice, signer=self.operator)
-        dex_balance = self.token.balance_of(address=self.dex, signer=self.operator)
-        burn_balance = self.token.balance_of(address=self.burn, signer=self.operator)
+        alice_balance = self.token.balance_of(
+            address=self.alice, signer=self.operator
+        )
+        dex_balance = self.token.balance_of(
+            address=self.dex, signer=self.operator
+        )
+        burn_balance = self.token.balance_of(
+            address=self.burn, signer=self.operator
+        )
 
         self.assertAmountEqual(dex_balance, "1095")
         self.assertAmountEqual(burn_balance, "2")
@@ -83,13 +91,17 @@ class TestReflectionToken(unittest.TestCase):
             owner_balance + alice_balance + dex_balance + burn_balance,
             INITIAL_SUPPLY,
         )
-        self.assertAmountEqual(self.token.get_total_supply(signer=self.operator), "99999998")
+        self.assertAmountEqual(
+            self.token.get_total_supply(signer=self.operator), "99999998"
+        )
 
     def test_including_holder_preserves_displayed_balance(self):
         self.token.transfer(amount=1000, to=self.alice, signer=self.operator)
         self.token.transfer(amount=1000, to=self.dex, signer=self.operator)
         self.token.exclude_from_rewards(address=self.dex, signer=self.operator)
-        self.token.set_fee_target(address=self.dex, enabled=True, signer=self.operator)
+        self.token.set_fee_target(
+            address=self.dex, enabled=True, signer=self.operator
+        )
         self.token.transfer(amount=100, to=self.dex, signer=self.alice)
 
         before = self.token.balance_of(address=self.dex, signer=self.operator)
@@ -107,7 +119,9 @@ class TestReflectionToken(unittest.TestCase):
 
     def test_transfer_from_applies_fees_when_spender_is_fee_target(self):
         self.token.transfer(amount=1000, to=self.alice, signer=self.operator)
-        self.token.set_fee_target(address=self.bob, enabled=True, signer=self.operator)
+        self.token.set_fee_target(
+            address=self.bob, enabled=True, signer=self.operator
+        )
         self.token.approve(amount=100, to=self.bob, signer=self.alice)
 
         self.token.transfer_from(
@@ -125,7 +139,9 @@ class TestReflectionToken(unittest.TestCase):
             ),
             "0",
         )
-        bob_balance = self.token.balance_of(address=self.bob, signer=self.operator)
+        bob_balance = self.token.balance_of(
+            address=self.bob, signer=self.operator
+        )
         self.assertGreater(bob_balance, ContractingDecimal("95"))
         self.assertLess(bob_balance, ContractingDecimal("95.00001"))
         self.assertAmountEqual(
@@ -148,7 +164,9 @@ class TestReflectionToken(unittest.TestCase):
         self.assertEqual(metadata_before["total_supply"], INITIAL_SUPPLY)
 
         self.token.transfer(amount=1000, to=self.alice, signer=self.operator)
-        self.token.set_fee_target(address=self.bob, enabled=True, signer=self.operator)
+        self.token.set_fee_target(
+            address=self.bob, enabled=True, signer=self.operator
+        )
         self.token.transfer(amount=100, to=self.bob, signer=self.alice)
 
         metadata_after = self.token.get_metadata(signer=self.operator)
@@ -166,7 +184,9 @@ class TestReflectionToken(unittest.TestCase):
                 signer=self.alice,
             )
 
-        self.token.change_operator(new_operator=self.alice, signer=self.operator)
+        self.token.change_operator(
+            new_operator=self.alice, signer=self.operator
+        )
 
         with self.assertRaises(AssertionError):
             self.token.change_metadata(

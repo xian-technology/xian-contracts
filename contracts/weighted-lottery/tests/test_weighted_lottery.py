@@ -127,7 +127,9 @@ class TestWeightedLottery(unittest.TestCase):
         self.assertEqual(lottery["status"], "cancelled")
         self.assertEqual(self.token.balance_of(address=self.bob), 100)
         self.assertEqual(self.token.balance_of(address=self.carol), 100)
-        self.assertEqual(self.token.balance_of(address="con_weighted_lottery"), 0)
+        self.assertEqual(
+            self.token.balance_of(address="con_weighted_lottery"), 0
+        )
 
     def test_draw_records_audit_fields(self):
         lottery_id = self.lottery.create_lottery(

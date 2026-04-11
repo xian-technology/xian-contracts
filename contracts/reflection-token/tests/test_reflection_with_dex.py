@@ -86,7 +86,9 @@ class TestReflectionTokenWithDex(unittest.TestCase):
         self.deadline = Datetime(2026, 1, 2)
 
         for account in (self.lp, self.trader):
-            self.currency.transfer(amount=5000, to=account, signer=self.operator)
+            self.currency.transfer(
+                amount=5000, to=account, signer=self.operator
+            )
             self.reflection.transfer(
                 amount=5000,
                 to=account,
@@ -163,31 +165,37 @@ class TestReflectionTokenWithDex(unittest.TestCase):
         self.assertAmountEqual(reserves[0], "950")
         self.assertAmountEqual(reserves[1], "1000")
 
-        buy_output = self.dex.swapExactTokenForTokenSupportingFeeOnTransferTokens(
-            amountIn=100,
-            amountOutMin=1,
-            pair=pair_id,
-            src="currency",
-            to=self.trader,
-            deadline=self.deadline,
-            signer=self.trader,
-            environment={"now": self.now},
+        buy_output = (
+            self.dex.swapExactTokenForTokenSupportingFeeOnTransferTokens(
+                amountIn=100,
+                amountOutMin=1,
+                pair=pair_id,
+                src="currency",
+                to=self.trader,
+                deadline=self.deadline,
+                signer=self.trader,
+                environment={"now": self.now},
+            )
         )
         self.assertGreater(buy_output, ContractingDecimal("0"))
         self.assertGreater(
-            self.reflection.balance_of(address=self.trader, signer=self.operator),
+            self.reflection.balance_of(
+                address=self.trader, signer=self.operator
+            ),
             ContractingDecimal("5000"),
         )
 
-        sell_output = self.dex.swapExactTokenForTokenSupportingFeeOnTransferTokens(
-            amountIn=100,
-            amountOutMin=1,
-            pair=pair_id,
-            src="con_reflection_token",
-            to=self.trader,
-            deadline=self.deadline,
-            signer=self.trader,
-            environment={"now": self.now},
+        sell_output = (
+            self.dex.swapExactTokenForTokenSupportingFeeOnTransferTokens(
+                amountIn=100,
+                amountOutMin=1,
+                pair=pair_id,
+                src="con_reflection_token",
+                to=self.trader,
+                deadline=self.deadline,
+                signer=self.trader,
+                environment={"now": self.now},
+            )
         )
         self.assertGreater(sell_output, ContractingDecimal("0"))
         self.assertGreater(
@@ -195,7 +203,9 @@ class TestReflectionTokenWithDex(unittest.TestCase):
             ContractingDecimal("5000"),
         )
 
-        reserves_after = self.pairs.getReserves(pair=pair_id, signer=self.operator)
+        reserves_after = self.pairs.getReserves(
+            pair=pair_id, signer=self.operator
+        )
         self.assertGreater(reserves_after[0], ContractingDecimal("0"))
         self.assertGreater(reserves_after[1], ContractingDecimal("0"))
 
@@ -244,7 +254,9 @@ class TestReflectionTokenWithDex(unittest.TestCase):
         self.assertGreater(reflection_after, reflection_before)
         self.assertAmountEqual(reflection_after - reflection_before, removed[0])
         self.assertAmountEqual(currency_after - currency_before, removed[1])
-        self.assertGreater(currency_after - currency_before, ContractingDecimal("0"))
+        self.assertGreater(
+            currency_after - currency_before, ContractingDecimal("0")
+        )
 
     def test_helper_buy_and_sell_flow(self):
         _, pair_id, _ = self.bootstrap_pair()
@@ -265,7 +277,9 @@ class TestReflectionTokenWithDex(unittest.TestCase):
         self.assertGreater(helper_buy[0], ContractingDecimal("0"))
         self.assertGreater(helper_buy[1], ContractingDecimal("0"))
         self.assertGreater(
-            self.reflection.balance_of(address=self.trader, signer=self.operator),
+            self.reflection.balance_of(
+                address=self.trader, signer=self.operator
+            ),
             trader_reflection_before,
         )
 
@@ -289,7 +303,9 @@ class TestReflectionTokenWithDex(unittest.TestCase):
             trader_currency_before,
         )
 
-        reserves_after = self.pairs.getReserves(pair=pair_id, signer=self.operator)
+        reserves_after = self.pairs.getReserves(
+            pair=pair_id, signer=self.operator
+        )
         self.assertGreater(reserves_after[0], ContractingDecimal("0"))
         self.assertGreater(reserves_after[1], ContractingDecimal("0"))
 

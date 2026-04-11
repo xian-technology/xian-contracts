@@ -42,6 +42,7 @@ ZK_REGISTRY_PATH = (
     / "zk_registry.s.py"
 )
 
+
 @lru_cache(maxsize=1)
 def load_fixture():
     prover = ShieldedNoteProver.build_insecure_dev_bundle()
@@ -113,7 +114,9 @@ def load_fixture():
             ],
         )
     )
-    transfer_commitments = deposit.output_commitments + transfer.output_commitments
+    transfer_commitments = (
+        deposit.output_commitments + transfer.output_commitments
+    )
     discovered_withdraw = scan_notes(
         asset_id=asset_id,
         commitments=transfer_commitments,
@@ -231,7 +234,9 @@ def indexed_tx(
 class TestShieldedNoteToken(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.relay_prover = ShieldedRelayTransferProver.build_insecure_dev_bundle()
+        cls.relay_prover = (
+            ShieldedRelayTransferProver.build_insecure_dev_bundle()
+        )
         cls.relay_manifest = shielded_relay_registry_manifest(
             cls.relay_prover,
             artifact_contract_name="con_shielded_note_token",
@@ -240,7 +245,9 @@ class TestShieldedNoteToken(unittest.TestCase):
     def setUp(self):
         self.fixture = load_fixture()
         self._storage_home = tempfile.TemporaryDirectory()
-        self.client = ContractingClient(storage_home=Path(self._storage_home.name))
+        self.client = ContractingClient(
+            storage_home=Path(self._storage_home.name)
+        )
         self.client.flush()
 
         with ZK_REGISTRY_PATH.open() as registry_file:
@@ -419,7 +426,9 @@ class TestShieldedNoteToken(unittest.TestCase):
             self.fixture["zero_root"],
         )
         self.assertTrue(
-            self.token.is_root_accepted(root=self.fixture["zero_root"], signer="sys")
+            self.token.is_root_accepted(
+                root=self.fixture["zero_root"], signer="sys"
+            )
         )
         self.assertEqual(
             self.token.get_metadata(signer="sys"),
@@ -484,8 +493,12 @@ class TestShieldedNoteToken(unittest.TestCase):
     def test_public_balance_transfer_and_allowance_flow(self):
         self.token.mint_public(amount=100, to=self.alice, signer="sys")
         self.token.transfer(amount=25, to=self.bob, signer=self.alice)
-        self.assertEqual(self.token.balance_of(address=self.alice, signer="sys"), 75)
-        self.assertEqual(self.token.balance_of(address=self.bob, signer="sys"), 25)
+        self.assertEqual(
+            self.token.balance_of(address=self.alice, signer="sys"), 75
+        )
+        self.assertEqual(
+            self.token.balance_of(address=self.bob, signer="sys"), 25
+        )
 
         self.token.approve(amount=30, to=self.bob, signer=self.alice)
         self.token.transfer_from(
@@ -495,7 +508,9 @@ class TestShieldedNoteToken(unittest.TestCase):
             signer=self.bob,
         )
         self.assertEqual(
-            self.token.allowance(owner=self.alice, spender=self.bob, signer="sys"),
+            self.token.allowance(
+                owner=self.alice, spender=self.bob, signer="sys"
+            ),
             10,
         )
         self.assertEqual(
@@ -510,12 +525,22 @@ class TestShieldedNoteToken(unittest.TestCase):
         transfer = self.fixture["transfer"]
         withdraw = self.fixture["withdraw"]
 
-        self.assertEqual(deposit_result["new_root"], deposit["expected_new_root"])
-        self.assertEqual(transfer_result["new_root"], transfer["expected_new_root"])
-        self.assertEqual(withdraw_result["new_root"], withdraw["expected_new_root"])
+        self.assertEqual(
+            deposit_result["new_root"], deposit["expected_new_root"]
+        )
+        self.assertEqual(
+            transfer_result["new_root"], transfer["expected_new_root"]
+        )
+        self.assertEqual(
+            withdraw_result["new_root"], withdraw["expected_new_root"]
+        )
 
-        self.assertEqual(self.token.balance_of(address=self.alice, signer="sys"), 30)
-        self.assertEqual(self.token.balance_of(address=self.bob, signer="sys"), 20)
+        self.assertEqual(
+            self.token.balance_of(address=self.alice, signer="sys"), 30
+        )
+        self.assertEqual(
+            self.token.balance_of(address=self.bob, signer="sys"), 20
+        )
         self.assertEqual(
             self.token.current_shielded_root(signer="sys"),
             withdraw["expected_new_root"],
@@ -547,9 +572,7 @@ class TestShieldedNoteToken(unittest.TestCase):
         )
         self.assertSupply(total=100, public=50, shielded=50)
         self.assertEqual(self.token.get_note_count(signer="sys"), 5)
-        self.assertIsNone(
-            self.token.get_note_commitment(index=0, signer="sys")
-        )
+        self.assertIsNone(self.token.get_note_commitment(index=0, signer="sys"))
         self.assertEqual(
             self.token.list_note_commitments(start=1, limit=3, signer="sys"),
             [],
@@ -600,16 +623,20 @@ class TestShieldedNoteToken(unittest.TestCase):
         second_commitment = deposit.output_commitments[1]
 
         self.assertEqual(
-            self.token.get_note_payload(commitment=first_commitment, signer="sys"),
+            self.token.get_note_payload(
+                commitment=first_commitment, signer="sys"
+            ),
             None,
         )
         self.assertIsNone(
-            self.token.get_note_payload(commitment=second_commitment, signer="sys")
+            self.token.get_note_payload(
+                commitment=second_commitment, signer="sys"
+            )
         )
         self.assertEqual(
-            self.token.get_commitment_info(commitment=first_commitment, signer="sys")[
-                "payload"
-            ],
+            self.token.get_commitment_info(
+                commitment=first_commitment, signer="sys"
+            )["payload"],
             None,
         )
         self.assertIsNone(
@@ -640,7 +667,9 @@ class TestShieldedNoteToken(unittest.TestCase):
             indexed_records[0].payload_hash,
             output_payload_hash("0x1234"),
         )
-        self.assertEqual(indexed_records[1].payload_hash, output_payload_hash(""))
+        self.assertEqual(
+            indexed_records[1].payload_hash, output_payload_hash("")
+        )
 
     def test_invalid_proof_reverts_without_state_change(self):
         self.token.mint_public(amount=100, to=self.alice, signer="sys")
@@ -655,7 +684,9 @@ class TestShieldedNoteToken(unittest.TestCase):
                 signer=self.alice,
             )
 
-        self.assertEqual(self.token.balance_of(address=self.alice, signer="sys"), 100)
+        self.assertEqual(
+            self.token.balance_of(address=self.alice, signer="sys"), 100
+        )
         self.assertEqual(
             self.token.current_shielded_root(signer="sys"),
             self.fixture["zero_root"],
@@ -713,7 +744,9 @@ class TestShieldedNoteToken(unittest.TestCase):
         withdraw = self.fixture["withdraw"]
 
         self.assertFalse(
-            self.token.is_root_accepted(root=self.fixture["zero_root"], signer="sys")
+            self.token.is_root_accepted(
+                root=self.fixture["zero_root"], signer="sys"
+            )
         )
         self.assertTrue(
             self.token.is_root_accepted(
@@ -871,9 +904,7 @@ class TestShieldedNoteToken(unittest.TestCase):
                 asset_id=asset_id,
                 old_root=deposit.expected_new_root,
                 append_state=tree_state(deposit.output_commitments),
-                inputs=[
-                    match.to_input() for match in discovered_after_deposit
-                ],
+                inputs=[match.to_input() for match in discovered_after_deposit],
                 outputs=[
                     ShieldedOutput.for_recipient(
                         bob_keys.recipient,
@@ -894,7 +925,9 @@ class TestShieldedNoteToken(unittest.TestCase):
             output_payloads=transfer_payloads,
             signer=self.alice,
         )
-        self.assertEqual(transfer_result["new_root"], transfer.expected_new_root)
+        self.assertEqual(
+            transfer_result["new_root"], transfer.expected_new_root
+        )
 
         commitments_after_transfer = (
             deposit.output_commitments + transfer.output_commitments
@@ -929,7 +962,9 @@ class TestShieldedNoteToken(unittest.TestCase):
         )
         recovered_for_bob = recover_encrypted_notes(
             asset_id=asset_id,
-            commitments=[record.commitment for record in records_after_transfer],
+            commitments=[
+                record.commitment for record in records_after_transfer
+            ],
             payloads=[record.payload for record in records_after_transfer],
             owner_secret=bob_keys.owner_secret,
             viewing_private_key=bob_keys.viewing_private_key,
@@ -973,10 +1008,16 @@ class TestShieldedNoteToken(unittest.TestCase):
             output_payloads=withdraw_payloads,
             signer=self.alice,
         )
-        self.assertEqual(withdraw_result["new_root"], withdraw.expected_new_root)
+        self.assertEqual(
+            withdraw_result["new_root"], withdraw.expected_new_root
+        )
 
-        self.assertEqual(self.token.balance_of(address=self.alice, signer="sys"), 30)
-        self.assertEqual(self.token.balance_of(address=self.bob, signer="sys"), 20)
+        self.assertEqual(
+            self.token.balance_of(address=self.alice, signer="sys"), 30
+        )
+        self.assertEqual(
+            self.token.balance_of(address=self.bob, signer="sys"), 20
+        )
         self.assertEqual(
             self.token.current_shielded_root(signer="sys"),
             withdraw.expected_new_root,
@@ -1047,8 +1088,12 @@ class TestShieldedNoteToken(unittest.TestCase):
             first_result["new_root"],
             second_result["new_root"],
         )
-        self.assertEqual(second_result["new_root"], second_deposit.expected_new_root)
-        self.assertEqual(self.token.balance_of(address=self.alice, signer="sys"), 50)
+        self.assertEqual(
+            second_result["new_root"], second_deposit.expected_new_root
+        )
+        self.assertEqual(
+            self.token.balance_of(address=self.alice, signer="sys"), 50
+        )
         self.assertSupply(total=100, public=50, shielded=50)
 
     @pytest.mark.slow
@@ -1114,8 +1159,13 @@ class TestShieldedNoteToken(unittest.TestCase):
         )
 
         self.assertEqual(withdraw_result["new_root"], deposit.expected_new_root)
-        self.assertEqual(self.token.current_shielded_root(signer="sys"), deposit.expected_new_root)
-        self.assertEqual(self.token.balance_of(address=self.alice, signer="sys"), 40)
+        self.assertEqual(
+            self.token.current_shielded_root(signer="sys"),
+            deposit.expected_new_root,
+        )
+        self.assertEqual(
+            self.token.balance_of(address=self.alice, signer="sys"), 40
+        )
         self.assertSupply(total=40, public=40, shielded=0)
 
         spent = alice_wallet.refresh_spent_status(

@@ -60,7 +60,9 @@ def main() -> None:
             validate_contract_source(path)
             checked += 1
 
-    print(f"Validated {checked} contract source files across {len(list(iter_packages()))} packages.")
+    print(
+        f"Validated {checked} contract source files across {len(list(iter_packages()))} packages."
+    )
 
 
 if __name__ == "__main__":
