@@ -1,0 +1,56 @@
+name: Validate
+
+on:
+  push:
+    branches:
+      - "*"
+  pull_request:
+    branches:
+      - "*"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout xian-contracts
+        uses: actions/checkout@v6
+        with:
+          path: xian-contracts
+
+      - name: Checkout xian-contracting
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ github.repository_owner }}/xian-contracting
+          ref: main
+          path: xian-contracting
+
+      - name: Checkout xian-linter
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ github.repository_owner }}/xian-linter
+          ref: main
+          path: xian-linter
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Sync dependencies
+        working-directory: xian-contracts
+        run: uv sync --group dev
+
+      - name: Ruff lint
+        working-directory: xian-contracts
+        run: uv run ruff check .
+
+      - name: Ruff format check
+        working-directory: xian-contracts
+        run: uv run ruff format --check .
+
+      - name: Run tests
+        working-directory: xian-contracts
+        run: uv run pytest -q
