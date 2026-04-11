@@ -12,8 +12,8 @@ TARGET_ENTRYPOINT = "interact"
 MAX_MEMO_LENGTH = 256
 
 TargetAllowedEvent = LogEvent(
-    event="ScheduledTargetAllowed",
-    params={
+    "ScheduledTargetAllowed",
+    {
         "target_contract": {"type": str, "idx": True},
         "enabled": {"type": bool},
         "actor": {"type": str, "idx": True},
@@ -21,8 +21,8 @@ TargetAllowedEvent = LogEvent(
 )
 
 ActionScheduledEvent = LogEvent(
-    event="ActionScheduled",
-    params={
+    "ActionScheduled",
+    {
         "action_id": {"type": int, "idx": True},
         "proposer": {"type": str, "idx": True},
         "target_contract": {"type": str, "idx": True},
@@ -31,16 +31,16 @@ ActionScheduledEvent = LogEvent(
 )
 
 ActionRescheduledEvent = LogEvent(
-    event="ActionRescheduled",
-    params={
+    "ActionRescheduled",
+    {
         "action_id": {"type": int, "idx": True},
         "actor": {"type": str, "idx": True},
     },
 )
 
 ActionCancelledEvent = LogEvent(
-    event="ActionCancelled",
-    params={
+    "ActionCancelled",
+    {
         "action_id": {"type": int, "idx": True},
         "actor": {"type": str, "idx": True},
         "reason": {"type": str},
@@ -48,16 +48,16 @@ ActionCancelledEvent = LogEvent(
 )
 
 ActionExpiredEvent = LogEvent(
-    event="ActionExpired",
-    params={
+    "ActionExpired",
+    {
         "action_id": {"type": int, "idx": True},
         "actor": {"type": str, "idx": True},
     },
 )
 
 ActionExecutedEvent = LogEvent(
-    event="ActionExecuted",
-    params={
+    "ActionExecuted",
+    {
         "action_id": {"type": int, "idx": True},
         "executor": {"type": str, "idx": True},
         "target_contract": {"type": str, "idx": True},

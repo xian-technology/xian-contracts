@@ -6,8 +6,8 @@ MAX_TEXT_LENGTH = 256
 TARGET_ENTRYPOINT = "interact"
 
 AdapterActionCreatedEvent = LogEvent(
-    event="ShieldedSchedulerActionCreated",
-    params={
+    "ShieldedSchedulerActionCreated",
+    {
         "adapter_action_id": {"type": int, "idx": True},
         "scheduler_action_id": {"type": int, "idx": True},
         "target_contract": {"type": str, "idx": True},
@@ -15,8 +15,8 @@ AdapterActionCreatedEvent = LogEvent(
 )
 
 AdapterActionUpdatedEvent = LogEvent(
-    event="ShieldedSchedulerActionUpdated",
-    params={
+    "ShieldedSchedulerActionUpdated",
+    {
         "adapter_action_id": {"type": int, "idx": True},
         "scheduler_action_id": {"type": int, "idx": True},
         "status": {"type": str},

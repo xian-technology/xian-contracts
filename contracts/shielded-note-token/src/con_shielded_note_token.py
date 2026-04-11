@@ -622,33 +622,51 @@ note_exists = Hash(default_value=False)
 note_count = Variable()
 metadata = Hash()
 
+TransferEvent = LogEvent(
+    "Transfer",
+    {
+        "from": {"type": str, "idx": True},
+        "to": {"type": str, "idx": True},
+        "amount": {"type": int},
+    },
+)
+
+ApproveEvent = LogEvent(
+    "Approve",
+    {
+        "from": {"type": str, "idx": True},
+        "to": {"type": str, "idx": True},
+        "amount": {"type": int},
+    },
+)
+
 VkConfigured = LogEvent(
-    event="VerifyingKeyConfigured",
-    params={
+    "VerifyingKeyConfigured",
+    {
         "action": {"type": str, "idx": True},
         "vk_id": {"type": str, "idx": True},
     },
 )
 
 OperatorChanged = LogEvent(
-    event="OperatorChanged",
-    params={
+    "OperatorChanged",
+    {
         "previous_operator": {"type": str, "idx": True},
         "new_operator": {"type": str, "idx": True},
     },
 )
 
 PublicMint = LogEvent(
-    event="PublicMint",
-    params={
+    "PublicMint",
+    {
         "to": {"type": str, "idx": True},
         "amount": {"type": int},
     },
 )
 
 PublicTransfer = LogEvent(
-    event="PublicTransfer",
-    params={
+    "PublicTransfer",
+    {
         "sender": {"type": str, "idx": True},
         "to": {"type": str, "idx": True},
         "amount": {"type": int},
@@ -656,8 +674,8 @@ PublicTransfer = LogEvent(
 )
 
 ShieldedDeposit = LogEvent(
-    event="ShieldedDeposit",
-    params={
+    "ShieldedDeposit",
+    {
         "account": {"type": str, "idx": True},
         "amount": {"type": int},
         "old_root": {"type": str, "idx": True},
@@ -667,8 +685,8 @@ ShieldedDeposit = LogEvent(
 )
 
 ShieldedTransfer = LogEvent(
-    event="ShieldedTransfer",
-    params={
+    "ShieldedTransfer",
+    {
         "account": {"type": str, "idx": True},
         "old_root": {"type": str, "idx": True},
         "new_root": {"type": str, "idx": True},
@@ -678,8 +696,8 @@ ShieldedTransfer = LogEvent(
 )
 
 ShieldedRelayTransfer = LogEvent(
-    event="ShieldedRelayTransfer",
-    params={
+    "ShieldedRelayTransfer",
+    {
         "execution_id": {"type": int, "idx": True},
         "relayer": {"type": str, "idx": True},
         "relay_binding": {"type": str},
@@ -695,8 +713,8 @@ ShieldedRelayTransfer = LogEvent(
 )
 
 ShieldedWithdraw = LogEvent(
-    event="ShieldedWithdraw",
-    params={
+    "ShieldedWithdraw",
+    {
         "account": {"type": str, "idx": True},
         "to": {"type": str, "idx": True},
         "amount": {"type": int},
@@ -708,8 +726,8 @@ ShieldedWithdraw = LogEvent(
 )
 
 ShieldedOutputsCommitted = LogEvent(
-    event="ShieldedOutputsCommitted",
-    params={
+    "ShieldedOutputsCommitted",
+    {
         "new_root": {"type": str, "idx": True},
         "action": {"type": str},
         "note_index_start": {"type": int},
@@ -726,6 +744,9 @@ def seed(
     token_symbol: str = "SNOTE",
     operator_address: str = None,
     root_window_size: int = 32,
+    token_logo_url: str = "",
+    token_logo_svg: str = "",
+    token_website: str = "",
 ):
     if operator_address is None or operator_address == "":
         operator_address = ctx.caller
@@ -738,6 +759,9 @@ def seed(
     assert 1 <= root_window_size <= MAX_ROOT_HISTORY_WINDOW, (
         "root_window_size out of range!"
     )
+    assert isinstance(token_logo_url, str), "token_logo_url must be a string!"
+    assert isinstance(token_logo_svg, str), "token_logo_svg must be a string!"
+    assert isinstance(token_website, str), "token_website must be a string!"
 
     operator.set(operator_address)
     total_supply.set(0)
@@ -752,7 +776,11 @@ def seed(
     note_count.set(0)
     metadata["token_name"] = token_name
     metadata["token_symbol"] = token_symbol
+    metadata["token_logo_url"] = token_logo_url
+    metadata["token_logo_svg"] = token_logo_svg
+    metadata["token_website"] = token_website
     metadata["precision"] = 0
+    metadata["total_supply"] = 0
 
 
 @export
@@ -760,6 +788,10 @@ def get_metadata():
     return {
         "token_name": metadata["token_name"],
         "token_symbol": metadata["token_symbol"],
+        "token_logo_url": metadata["token_logo_url"],
+        "token_logo_svg": metadata["token_logo_svg"],
+        "token_website": metadata["token_website"],
+        "total_supply": metadata["total_supply"],
         "precision": metadata["precision"],
     }
 
@@ -977,8 +1009,19 @@ def get_relay_execution(execution_id: int):
 
 
 @export
-def balance_of(account: str):
-    return balances[account]
+def change_metadata(key: str, value: Any):
+    require_operator()
+    assert isinstance(key, str) and key != "", "key must be a non-empty string!"
+    assert key not in ("precision", "total_supply"), (
+        "Managed metadata cannot be changed."
+    )
+    metadata[key] = value
+    return value
+
+
+@export
+def balance_of(address: str):
+    return balances[address]
 
 
 @export
@@ -993,6 +1036,7 @@ def approve(amount: int, to: str):
     )
     assert isinstance(to, str) and to != "", "Approval target must be non-empty!"
     approvals[ctx.caller, to] = amount
+    ApproveEvent({"from": ctx.caller, "to": to, "amount": amount})
     return amount
 
 
@@ -1005,6 +1049,7 @@ def transfer(amount: int, to: str):
     balances[ctx.caller] -= amount
     balances[to] += amount
 
+    TransferEvent({"from": ctx.caller, "to": to, "amount": amount})
     PublicTransfer({"sender": ctx.caller, "to": to, "amount": amount})
     return amount
 
@@ -1025,6 +1070,7 @@ def transfer_from(amount: int, to: str, main_account: str):
     balances[main_account] -= amount
     balances[to] += amount
 
+    TransferEvent({"from": main_account, "to": to, "amount": amount})
     PublicTransfer({"sender": main_account, "to": to, "amount": amount})
     return amount
 
@@ -1094,6 +1140,7 @@ def mint_public(amount: int, to: str):
     balances[to] += amount
     total_supply.set(total_supply.get() + amount)
     public_supply.set(public_supply.get() + amount)
+    metadata["total_supply"] = total_supply.get()
     assert_supply_invariant()
 
     PublicMint({"to": to, "amount": amount})
@@ -1154,6 +1201,7 @@ def deposit_shielded(
     balances[ctx.caller] -= amount
     public_supply.set(public_supply.get() - amount)
     shielded_supply.set(shielded_supply.get() + amount)
+    metadata["total_supply"] = total_supply.get()
     new_root = append_output_commitments(
         output_commitments,
         payload_hashes,
@@ -1287,6 +1335,7 @@ def relay_transfer_shielded(
         public_supply.set(public_supply.get() + relayer_fee)
         shielded_supply.set(shielded_supply.get() - relayer_fee)
 
+    metadata["total_supply"] = total_supply.get()
     assert_supply_invariant()
 
     execution_id = relay_execution_count.get()
@@ -1356,6 +1405,7 @@ def withdraw_shielded(
     balances[to] += amount
     public_supply.set(public_supply.get() + amount)
     shielded_supply.set(shielded_supply.get() - amount)
+    metadata["total_supply"] = total_supply.get()
     new_root = append_output_commitments(
         output_commitments,
         payload_hashes,

@@ -9,8 +9,8 @@ pool_stats = Hash()
 
 # Events
 PoolCreatedEvent = LogEvent(
-    event="PoolCreated",
-    params={
+    "PoolCreated",
+    {
         "pool_id": {"type": str, "idx": True},
         "creator": {"type": str, "idx": True},
         "stake_token": {"type": str, "idx": True},
@@ -22,8 +22,8 @@ PoolCreatedEvent = LogEvent(
 )
 
 StakeEvent = LogEvent(
-    event="Stake",
-    params={
+    "Stake",
+    {
         "pool_id": {"type": str, "idx": True},
         "staker": {"type": str, "idx": True},
         "amount": {"type": (int, float, decimal)},
@@ -32,8 +32,8 @@ StakeEvent = LogEvent(
 )
 
 UnstakeEvent = LogEvent(
-    event="Unstake",
-    params={
+    "Unstake",
+    {
         "pool_id": {"type": str, "idx": True},
         "staker": {"type": str, "idx": True},
         "amount": {"type": (int, float, decimal)},

@@ -718,32 +718,32 @@ relayers = Hash(default_value=False)
 
 
 VkConfigured = LogEvent(
-    event="VerifyingKeyConfigured",
-    params={
+    "VerifyingKeyConfigured",
+    {
         "action": {"type": str, "idx": True},
         "vk_id": {"type": str, "idx": True},
     },
 )
 
 OperatorChanged = LogEvent(
-    event="OperatorChanged",
-    params={
+    "OperatorChanged",
+    {
         "previous_operator": {"type": str, "idx": True},
         "new_operator": {"type": str, "idx": True},
     },
 )
 
 RootAccepted = LogEvent(
-    event="RootAccepted",
-    params={
+    "RootAccepted",
+    {
         "root": {"type": str, "idx": True},
         "index": {"type": int},
     },
 )
 
 ShieldedDeposit = LogEvent(
-    event="ShieldedCommandDeposit",
-    params={
+    "ShieldedCommandDeposit",
+    {
         "account": {"type": str, "idx": True},
         "amount": {"type": int},
         "old_root": {"type": str, "idx": True},
@@ -753,8 +753,8 @@ ShieldedDeposit = LogEvent(
 )
 
 ShieldedCommandExecuted = LogEvent(
-    event="ShieldedCommandExecuted",
-    params={
+    "ShieldedCommandExecuted",
+    {
         "execution_id": {"type": int, "idx": True},
         "relayer": {"type": str, "idx": True},
         "target_contract": {"type": str, "idx": True},
@@ -772,8 +772,8 @@ ShieldedCommandExecuted = LogEvent(
 )
 
 ShieldedWithdraw = LogEvent(
-    event="ShieldedCommandWithdraw",
-    params={
+    "ShieldedCommandWithdraw",
+    {
         "account": {"type": str, "idx": True},
         "to": {"type": str, "idx": True},
         "amount": {"type": int},
@@ -785,8 +785,8 @@ ShieldedWithdraw = LogEvent(
 )
 
 ShieldedOutputCommitted = LogEvent(
-    event="ShieldedOutputCommitted",
-    params={
+    "ShieldedOutputCommitted",
+    {
         "commitment": {"type": str, "idx": True},
         "new_root": {"type": str, "idx": True},
         "note_index": {"type": int},

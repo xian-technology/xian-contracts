@@ -19,32 +19,32 @@ RESERVED_PROFILE_FIELDS = [
 ]
 
 ProfileRegisteredEvent = LogEvent(
-    event="ProfileRegistered",
-    params={
+    "ProfileRegistered",
+    {
         "account": {"type": str, "idx": True},
         "username": {"type": str, "idx": True},
     },
 )
 
 ProfileUpdatedEvent = LogEvent(
-    event="ProfileUpdated",
-    params={
+    "ProfileUpdated",
+    {
         "account": {"type": str, "idx": True},
         "username": {"type": str, "idx": True},
     },
 )
 
 ChannelCreatedEvent = LogEvent(
-    event="ProfileChannelCreated",
-    params={
+    "ProfileChannelCreated",
+    {
         "channel_name": {"type": str, "idx": True},
         "owner": {"type": str, "idx": True},
     },
 )
 
 ChannelUpdatedEvent = LogEvent(
-    event="ProfileChannelUpdated",
-    params={
+    "ProfileChannelUpdated",
+    {
         "channel_name": {"type": str, "idx": True},
         "owner": {"type": str, "idx": True},
     },

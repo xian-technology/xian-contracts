@@ -27,8 +27,8 @@ TOKEN_INTERFACE = [
 
 
 StreamCreatedEvent = LogEvent(
-    event="StreamCreated",
-    params={
+    "StreamCreated",
+    {
         "stream_id": {"type": str, "idx": True},
         "token": {"type": str},
         "sender": {"type": str, "idx": True},
@@ -41,8 +41,8 @@ StreamCreatedEvent = LogEvent(
 )
 
 StreamBalancedEvent = LogEvent(
-    event="StreamBalanced",
-    params={
+    "StreamBalanced",
+    {
         "stream_id": {"type": str, "idx": True},
         "token": {"type": str},
         "sender": {"type": str, "idx": True},
@@ -53,8 +53,8 @@ StreamBalancedEvent = LogEvent(
 )
 
 StreamCloseChangedEvent = LogEvent(
-    event="StreamCloseChanged",
-    params={
+    "StreamCloseChanged",
+    {
         "stream_id": {"type": str, "idx": True},
         "sender": {"type": str, "idx": True},
         "receiver": {"type": str, "idx": True},
@@ -65,8 +65,8 @@ StreamCloseChangedEvent = LogEvent(
 )
 
 StreamForfeitedEvent = LogEvent(
-    event="StreamForfeited",
-    params={
+    "StreamForfeited",
+    {
         "stream_id": {"type": str, "idx": True},
         "sender": {"type": str, "idx": True},
         "receiver": {"type": str, "idx": True},
@@ -77,8 +77,8 @@ StreamForfeitedEvent = LogEvent(
 )
 
 StreamFinalizedEvent = LogEvent(
-    event="StreamFinalized",
-    params={
+    "StreamFinalized",
+    {
         "stream_id": {"type": str, "idx": True},
         "sender": {"type": str, "idx": True},
         "receiver": {"type": str, "idx": True},

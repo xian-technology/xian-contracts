@@ -13,8 +13,8 @@ MAX_GAME_TYPE_LENGTH = 64
 MAX_TEXT_LENGTH = 256
 
 GameTypeAllowedEvent = LogEvent(
-    event="TurnGameTypeAllowed",
-    params={
+    "TurnGameTypeAllowed",
+    {
         "game_type": {"type": str, "idx": True},
         "enabled": {"type": bool},
         "actor": {"type": str, "idx": True},
@@ -22,8 +22,8 @@ GameTypeAllowedEvent = LogEvent(
 )
 
 MatchCreatedEvent = LogEvent(
-    event="TurnMatchCreated",
-    params={
+    "TurnMatchCreated",
+    {
         "match_id": {"type": int, "idx": True},
         "game_type": {"type": str, "idx": True},
         "creator": {"type": str, "idx": True},
@@ -31,16 +31,16 @@ MatchCreatedEvent = LogEvent(
 )
 
 MatchJoinedEvent = LogEvent(
-    event="TurnMatchJoined",
-    params={
+    "TurnMatchJoined",
+    {
         "match_id": {"type": int, "idx": True},
         "opponent": {"type": str, "idx": True},
     },
 )
 
 MoveRecordedEvent = LogEvent(
-    event="TurnMoveRecorded",
-    params={
+    "TurnMoveRecorded",
+    {
         "match_id": {"type": int, "idx": True},
         "player": {"type": str, "idx": True},
         "move_index": {"type": int, "idx": True},
@@ -48,8 +48,8 @@ MoveRecordedEvent = LogEvent(
 )
 
 MatchResultProposedEvent = LogEvent(
-    event="TurnMatchResultProposed",
-    params={
+    "TurnMatchResultProposed",
+    {
         "match_id": {"type": int, "idx": True},
         "proposer": {"type": str, "idx": True},
         "winner": {"type": str},
@@ -57,8 +57,8 @@ MatchResultProposedEvent = LogEvent(
 )
 
 MatchResolvedEvent = LogEvent(
-    event="TurnMatchResolved",
-    params={
+    "TurnMatchResolved",
+    {
         "match_id": {"type": int, "idx": True},
         "winner": {"type": str},
     },

@@ -21,8 +21,8 @@ fee_targets = Hash(default_value=False)
 
 
 TransferEvent = LogEvent(
-    event='Transfer',
-    params={
+    'Transfer',
+    {
         'from': {'type': str, 'idx': True},
         'to': {'type': str, 'idx': True},
         'amount': {'type': (int, float, decimal)},
@@ -34,8 +34,8 @@ TransferEvent = LogEvent(
 )
 
 ApproveEvent = LogEvent(
-    event='Approve',
-    params={
+    'Approve',
+    {
         'owner': {'type': str, 'idx': True},
         'spender': {'type': str, 'idx': True},
         'amount': {'type': (int, float, decimal)},
@@ -43,8 +43,8 @@ ApproveEvent = LogEvent(
 )
 
 RewardStatusChangedEvent = LogEvent(
-    event='RewardStatusChanged',
-    params={
+    'RewardStatusChanged',
+    {
         'address': {'type': str, 'idx': True},
         'excluded': {'type': bool},
         'balance': {'type': (int, float, decimal)},
@@ -52,8 +52,8 @@ RewardStatusChangedEvent = LogEvent(
 )
 
 FeeTargetChangedEvent = LogEvent(
-    event='FeeTargetChanged',
-    params={
+    'FeeTargetChanged',
+    {
         'address': {'type': str, 'idx': True},
         'enabled': {'type': bool},
     },

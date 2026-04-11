@@ -14,8 +14,8 @@ MAX_REASON_LENGTH = 256
 MAX_ENTROPY_HINT_LENGTH = 256
 
 LotteryCreatedEvent = LogEvent(
-    event="WeightedLotteryCreated",
-    params={
+    "WeightedLotteryCreated",
+    {
         "lottery_id": {"type": int, "idx": True},
         "creator": {"type": str, "idx": True},
         "token_contract": {"type": str, "idx": True},
@@ -23,8 +23,8 @@ LotteryCreatedEvent = LogEvent(
 )
 
 TicketsPurchasedEvent = LogEvent(
-    event="WeightedLotteryTicketsPurchased",
-    params={
+    "WeightedLotteryTicketsPurchased",
+    {
         "lottery_id": {"type": int, "idx": True},
         "buyer": {"type": str, "idx": True},
         "ticket_count": {"type": int},
@@ -32,8 +32,8 @@ TicketsPurchasedEvent = LogEvent(
 )
 
 LotteryCancelledEvent = LogEvent(
-    event="WeightedLotteryCancelled",
-    params={
+    "WeightedLotteryCancelled",
+    {
         "lottery_id": {"type": int, "idx": True},
         "actor": {"type": str, "idx": True},
         "reason": {"type": str},
@@ -41,8 +41,8 @@ LotteryCancelledEvent = LogEvent(
 )
 
 LotteryRefundedEvent = LogEvent(
-    event="WeightedLotteryRefunded",
-    params={
+    "WeightedLotteryRefunded",
+    {
         "lottery_id": {"type": int, "idx": True},
         "account": {"type": str, "idx": True},
         "amount": {"type": (int, float, decimal)},
@@ -50,8 +50,8 @@ LotteryRefundedEvent = LogEvent(
 )
 
 LotteryDrawnEvent = LogEvent(
-    event="WeightedLotteryDrawn",
-    params={
+    "WeightedLotteryDrawn",
+    {
         "lottery_id": {"type": int, "idx": True},
         "winner": {"type": str, "idx": True},
         "ticket_count": {"type": int},
