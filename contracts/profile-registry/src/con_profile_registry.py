@@ -68,9 +68,10 @@ def validate_identifier(value: str, label: str, max_length: int):
     assert len(value) <= max_length, label + " is too long."
     assert value[0] not in ("-", "_"), label + " cannot start with '-' or '_'."
     assert value[-1] not in ("-", "_"), label + " cannot end with '-' or '_'."
-    assert all([c.isalnum() or c in ("_", "-") for c in value]), (
-        label + " contains invalid characters."
-    )
+    for character in value:
+        assert character.isalnum() or character in ("_", "-"), (
+            label + " contains invalid characters."
+        )
 
 
 def canonicalize_identifier(value: str, label: str, max_length: int):

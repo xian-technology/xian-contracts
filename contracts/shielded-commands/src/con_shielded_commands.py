@@ -316,7 +316,7 @@ def command_execution_tag_hex(input_nullifiers: list, command_binding: str):
 
 
 def require_action(action: str):
-    assert action in {"deposit", "command", "withdraw"}, (
+    assert action in ("deposit", "command", "withdraw"), (
         "Unsupported action!"
     )
 
@@ -400,7 +400,7 @@ def pad_field_values(values: list, size: int):
     for value in values:
         require_field_hex32("padded field value", value)
         padded.append(value)
-    while len(padded) < size:
+    for pad_index in range(len(padded), size):
         padded.append(FIELD_ZERO_HEX)
     return padded
 

@@ -84,9 +84,10 @@ def normalize_identifier(value: str, label: str, max_length: int):
     assert len(normalized) <= max_length, label + " is too long."
     assert normalized[0] not in ("-", "_"), label + " cannot start with '-' or '_'."
     assert normalized[-1] not in ("-", "_"), label + " cannot end with '-' or '_'."
-    assert all([c.isalnum() or c in ("_", "-") for c in normalized]), (
-        label + " contains invalid characters."
-    )
+    for character in normalized:
+        assert character.isalnum() or character in ("_", "-"), (
+            label + " contains invalid characters."
+        )
     return normalized
 
 
