@@ -42,6 +42,24 @@ jobs:
           ref: main
           path: xian-linter
 
+      - name: Checkout xian-configs
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ github.repository_owner }}/xian-configs
+          ref: main
+          path: xian-configs
+
+      - name: Use matching xian-configs branch when available
+        shell: bash
+        run: |
+          set -euo pipefail
+          BRANCH="${{ github.head_ref || github.ref_name }}"
+          REMOTE="https://github.com/${{ github.repository_owner }}/xian-configs"
+          if git ls-remote --exit-code --heads "$REMOTE" "$BRANCH" >/dev/null 2>&1; then
+            git -C xian-configs fetch --depth=1 origin "$BRANCH"
+            git -C xian-configs checkout -B "$BRANCH" FETCH_HEAD
+          fi
+
       - name: Set up Python 3.12
         uses: actions/setup-python@v6
         with:
