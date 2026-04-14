@@ -24,10 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 CONTRACT_PATH = ROOT / "src" / "con_shielded_commands.py"
 WORKSPACE_ROOT = Path(__file__).resolve().parents[4]
 ZK_REGISTRY_PATH = (
-    WORKSPACE_ROOT
-    / "xian-configs"
-    / "contracts"
-    / "zk_registry.s.py"
+    WORKSPACE_ROOT / "xian-configs" / "contracts" / "zk_registry.s.py"
 )
 
 TOKEN_CODE = """
