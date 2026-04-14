@@ -1,6 +1,3 @@
-import zk_registry
-
-
 FIELD_MODULUS = (
     21888242871839275222246405745257275088548364400416034343698204186575808495617
 )
@@ -273,7 +270,7 @@ def relay_execution_tag_hex(input_nullifiers: list, relay_binding: str):
 
 
 def require_action(action: str):
-    assert action in {"deposit", "transfer", "withdraw", "relay_transfer"}, (
+    assert action in ("deposit", "transfer", "withdraw", "relay_transfer"), (
         "Unsupported action!"
     )
 
@@ -351,7 +348,7 @@ def pad_field_values(values: list, size: int):
     for value in values:
         require_field_hex32("padded field value", value)
         padded.append(value)
-    while len(padded) < size:
+    for pad_index in range(len(padded), size):
         padded.append(FIELD_ZERO_HEX)
     return padded
 
@@ -530,7 +527,7 @@ def spend_nullifiers(nullifiers: list):
 def verify_proof(action: str, proof_hex: str, public_inputs: list):
     require_hex_blob("proof_hex", proof_hex)
     vk_id = vk_id_for(action)
-    info = zk_registry.get_vk_info(vk_id)
+    info = zk.get_vk_info(vk_id)
     assert info is not None, "Configured verifying key is missing!"
     assert info["active"] is True, "Configured verifying key is inactive!"
     assert info["vk_hash"] == pinned_vk_hash_for(action), (
@@ -1097,7 +1094,7 @@ def configure_vk(action: str, vk_id: str):
     require_operator()
     require_action(action)
     assert zk.has_verifying_key(vk_id), "Unknown or inactive verifying key!"
-    info = zk_registry.get_vk_info(vk_id)
+    info = zk.get_vk_info(vk_id)
     assert info is not None and info["active"] is True, (
         "Unknown or inactive verifying key!"
     )

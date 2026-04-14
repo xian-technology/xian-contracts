@@ -24,12 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 CONTRACT_PATH = ROOT / "src" / "con_shielded_commands.py"
 WORKSPACE_ROOT = Path(__file__).resolve().parents[4]
 ZK_REGISTRY_PATH = (
-    WORKSPACE_ROOT
-    / "xian-contracting"
-    / "tests"
-    / "integration"
-    / "test_contracts"
-    / "zk_registry.s.py"
+    WORKSPACE_ROOT / "xian-configs" / "contracts" / "zk_registry.s.py"
 )
 
 TOKEN_CODE = """
@@ -186,15 +181,12 @@ class TestShieldedCommands(unittest.TestCase):
         self.client.flush()
 
         with ZK_REGISTRY_PATH.open() as registry_file:
-            self.client.raw_driver.set_contract_from_source(
+            self.client.submit(
+                registry_file.read(),
                 name="zk_registry",
-                source=registry_file.read(),
-                lint=False,
             )
-        self.client.raw_driver.commit()
 
         self.registry = self.client.get_contract("zk_registry")
-        self.registry.seed(owner="sys", signer="sys")
         for entry in self.registry_manifest["registry_entries"]:
             args = dict(entry)
             args.pop("action", None)
