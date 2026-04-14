@@ -69,6 +69,13 @@ jobs:
             ../xian-contracting/scripts/audit_python_vm_compatibility.py \
             ./contracts \
             --fail-on-issues
+      - name: Audit authored contract conformance coverage
+        working-directory: xian-contracts
+        run: |
+          uv run --project ../xian-contracting python \
+            ../xian-contracting/scripts/audit_authored_conformance.py \
+            ./contracts \
+            --fail-on-issues
 
       - name: Run tests
         working-directory: xian-contracts
