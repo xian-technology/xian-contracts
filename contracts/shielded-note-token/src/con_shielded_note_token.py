@@ -87,7 +87,7 @@ def mimc_round_constant(round_index: int):
 
 def mimc_permute(state: int):
     assert isinstance(state, int), "MiMC state must be an integer!"
-    state %= FIELD_MODULUS
+    state = state % FIELD_MODULUS
     for round_index in range(MIMC_ROUNDS):
         state = pow(
             (state + mimc_round_constant(round_index)) % FIELD_MODULUS,
@@ -416,8 +416,8 @@ def pack_field_values(values: list):
             "Packed field contains reserved delimiter!"
         )
         if index > 0:
-            packed += LIST_BLOB_DELIMITER
-        packed += value
+            packed = packed + LIST_BLOB_DELIMITER
+        packed = packed + value
     return packed
 
 
@@ -1043,8 +1043,8 @@ def transfer(amount: int, to: str):
     assert isinstance(to, str) and to != "", "Transfer target must be non-empty!"
     assert balances[ctx.caller] >= amount, "Not enough balance!"
 
-    balances[ctx.caller] -= amount
-    balances[to] += amount
+    balances[ctx.caller] = balances[ctx.caller] - amount
+    balances[to] = balances[to] + amount
 
     TransferEvent({"from": ctx.caller, "to": to, "amount": amount})
     PublicTransfer({"sender": ctx.caller, "to": to, "amount": amount})
@@ -1063,9 +1063,11 @@ def transfer_from(amount: int, to: str, main_account: str):
     )
     assert balances[main_account] >= amount, "Not enough balance!"
 
-    approvals[main_account, ctx.caller] -= amount
-    balances[main_account] -= amount
-    balances[to] += amount
+    approvals[main_account, ctx.caller] = (
+        approvals[main_account, ctx.caller] - amount
+    )
+    balances[main_account] = balances[main_account] - amount
+    balances[to] = balances[to] + amount
 
     TransferEvent({"from": main_account, "to": to, "amount": amount})
     PublicTransfer({"sender": main_account, "to": to, "amount": amount})
@@ -1134,7 +1136,7 @@ def mint_public(amount: int, to: str):
     require_positive_amount(amount)
     assert isinstance(to, str) and to != "", "Recipient must be non-empty!"
 
-    balances[to] += amount
+    balances[to] = balances[to] + amount
     total_supply.set(total_supply.get() + amount)
     public_supply.set(public_supply.get() + amount)
     metadata["total_supply"] = total_supply.get()
@@ -1195,7 +1197,7 @@ def deposit_shielded(
     )
     verify_proof("deposit", proof_hex, public_inputs)
 
-    balances[ctx.caller] -= amount
+    balances[ctx.caller] = balances[ctx.caller] - amount
     public_supply.set(public_supply.get() - amount)
     shielded_supply.set(shielded_supply.get() + amount)
     metadata["total_supply"] = total_supply.get()
@@ -1328,7 +1330,7 @@ def relay_transfer_shielded(
     )
 
     if relayer_fee > 0:
-        balances[ctx.caller] += relayer_fee
+        balances[ctx.caller] = balances[ctx.caller] + relayer_fee
         public_supply.set(public_supply.get() + relayer_fee)
         shielded_supply.set(shielded_supply.get() - relayer_fee)
 
@@ -1399,7 +1401,7 @@ def withdraw_shielded(
     verify_proof("withdraw", proof_hex, public_inputs)
 
     spend_nullifiers(input_nullifiers)
-    balances[to] += amount
+    balances[to] = balances[to] + amount
     public_supply.set(public_supply.get() + amount)
     shielded_supply.set(shielded_supply.get() - amount)
     metadata["total_supply"] = total_supply.get()

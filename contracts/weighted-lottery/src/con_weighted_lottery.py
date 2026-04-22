@@ -246,9 +246,15 @@ def buy_tickets(lottery_id: int, ticket_count: int, buyer_entropy: str = ""):
         entrants.append(ctx.caller)
         lotteries[lottery_id, "entrants"] = entrants
 
-    entries[lottery_id, ctx.caller] += ticket_count
-    lotteries[lottery_id, "total_tickets"] += ticket_count
-    lotteries[lottery_id, "pot_amount"] += amount
+    entries[lottery_id, ctx.caller] = (
+        entries[lottery_id, ctx.caller] + ticket_count
+    )
+    lotteries[lottery_id, "total_tickets"] = (
+        lotteries[lottery_id, "total_tickets"] + ticket_count
+    )
+    lotteries[lottery_id, "pot_amount"] = (
+        lotteries[lottery_id, "pot_amount"] + amount
+    )
     lotteries[lottery_id, "entropy_accumulator"] = update_entropy(
         lotteries[lottery_id, "entropy_accumulator"],
         ctx.caller,
@@ -301,9 +307,15 @@ def claim_refund(lottery_id: int):
     ticket_count = entries[lottery_id, ctx.caller]
     amount = lotteries[lottery_id, "ticket_price"] * decimal(str(ticket_count))
     refunds_claimed[lottery_id, ctx.caller] = True
-    lotteries[lottery_id, "refunded_tickets"] += ticket_count
-    lotteries[lottery_id, "refunded_amount"] += amount
-    lotteries[lottery_id, "pot_amount"] -= amount
+    lotteries[lottery_id, "refunded_tickets"] = (
+        lotteries[lottery_id, "refunded_tickets"] + ticket_count
+    )
+    lotteries[lottery_id, "refunded_amount"] = (
+        lotteries[lottery_id, "refunded_amount"] + amount
+    )
+    lotteries[lottery_id, "pot_amount"] = (
+        lotteries[lottery_id, "pot_amount"] - amount
+    )
     lotteries[lottery_id, "updated_at"] = now
 
     token = importlib.import_module(lotteries[lottery_id, "token_contract"])
@@ -341,7 +353,7 @@ def draw_winner(lottery_id: int):
     winner = None
     running_total = 0
     for entrant in entrants:
-        running_total += entries[lottery_id, entrant]
+        running_total = running_total + entries[lottery_id, entrant]
         if winning_ticket < running_total:
             winner = entrant
             break

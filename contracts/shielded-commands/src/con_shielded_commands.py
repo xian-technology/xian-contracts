@@ -87,7 +87,7 @@ def mimc_round_constant(round_index: int):
 
 def mimc_permute(state: int):
     assert isinstance(state, int), "MiMC state must be an integer!"
-    state %= FIELD_MODULUS
+    state = state % FIELD_MODULUS
     for round_index in range(MIMC_ROUNDS):
         state = pow(
             (state + mimc_round_constant(round_index)) % FIELD_MODULUS,

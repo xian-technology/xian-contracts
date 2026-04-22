@@ -214,7 +214,7 @@ def perform_create_stream(
     streams[stream_id, DEPOSIT_KEY] = deposit
     streams[stream_id, NONCE_KEY] = sender_nonces[sender]
 
-    sender_nonces[sender] += 1
+    sender_nonces[sender] = sender_nonces[sender] + 1
 
     StreamCreatedEvent(
         {
