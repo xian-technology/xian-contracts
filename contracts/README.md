@@ -18,7 +18,6 @@ This folder contains the curated contract packages in `xian-contracts`.
 
 ## Packages
 
-- `dex/`: router, pair factory, and helper contracts
 - `lottery/`: simple lottery example
 - `nameservice/`: renewable name registry
 - `profile-registry/`: social profile and channel registry scaffold
@@ -33,3 +32,9 @@ This folder contains the curated contract packages in `xian-contracts`.
 - `turn-based-games/`: generic turn-based match registry
 - `weighted-lottery/`: ticket-weighted lottery example
 - `xsc001/`: token interface checker
+
+## Moved Packages
+
+- DEX moved to the sibling `xian-dex` repository, which now owns the canonical
+  `con_pairs`, `con_dex`, `con_dex_helper`, LP token contract, tests, and web
+  frontend.

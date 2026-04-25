@@ -2,7 +2,6 @@
 
 ## High Value Follow-Up
 
-- Add deeper automated tests for `dex`.
 - Add automated tests for `privacy-token`.
 - Add full proving-circuit fixtures and witness-generation tooling for
   `shielded-note-token`.
@@ -12,8 +11,8 @@
   token once a common permit surface is standardized across curated token
   packages.
 - Add at least smoke coverage for `lottery` if it remains in the curated hub.
-- Review whether `dex` should be split into a cleaner `v2`-style package with
-  stronger test coverage and more current code style.
+- Track DEX hardening and test-depth follow-up in the sibling `xian-dex`
+  repository.
 
 ## Open Questions
 

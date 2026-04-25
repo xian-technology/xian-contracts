@@ -32,7 +32,8 @@ contracts/<package-name>/
 Examples:
 
 - standalone: `nameservice`, `lottery`, `xsc001`
-- grouped system: `dex`
+- grouped system: a tightly coupled contract family that is deployed and
+  reviewed together
 
 ## Package README Expectations
 

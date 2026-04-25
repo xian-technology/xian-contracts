@@ -24,6 +24,12 @@ uv run pytest -m slow
 - Keep platform/runtime semantics in `xian-contracting`. This repo curates
   contract packages on top of that surface.
 
+## Moved Packages
+
+- The DEX contracts and SnakX web frontend moved to the sibling `xian-dex`
+  repository. This hub keeps DEX-adjacent adapters and examples, but no longer
+  owns the canonical `con_pairs`, `con_dex`, or `con_dex_helper` sources.
+
 ## Package Status
 
 | Package | Status | Purpose |
@@ -31,7 +37,6 @@ uv run pytest -m slow
 | `contracts/nameservice` | curated | Manager-governed name registry with renewal and primary-name mapping |
 | `contracts/staking` | curated | Multi-pool staking contract with reward deposits and emergency controls |
 | `contracts/xsc001` | curated | Token interface checker contract |
-| `contracts/dex` | candidate | Multi-contract DEX package with pairs, router, and helper contracts |
 | `contracts/profile-registry` | candidate | Social profile and channel registry scaffold with username resolution |
 | `contracts/scheduled-actions` | candidate | Allowlisted delayed-call scheduler with cancellation and execution controls |
 | `contracts/shielded-dex-adapter` | candidate | Capability-style adapter that lets shielded commands spend a proof-bound public budget through the Xian DEX |
