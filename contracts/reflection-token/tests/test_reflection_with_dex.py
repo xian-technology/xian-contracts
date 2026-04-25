@@ -1,3 +1,5 @@
+import os
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -6,11 +8,18 @@ from xian_runtime_types.decimal import ContractingDecimal
 from xian_runtime_types.time import Datetime
 
 ROOT = Path(__file__).resolve().parents[1]
-CONTRACTS_ROOT = ROOT.parent
+WORKSPACE_ROOT = Path(
+    os.environ.get("XIAN_WORKSPACE_ROOT", ROOT.parents[2])
+).expanduser()
 REFLECTION_PATH = ROOT / "src" / "con_reflection_token.py"
-DEX_PAIRS_PATH = CONTRACTS_ROOT / "dex" / "src" / "con_pairs.py"
-DEX_ROUTER_PATH = CONTRACTS_ROOT / "dex" / "src" / "con_dex.py"
-DEX_HELPER_PATH = CONTRACTS_ROOT / "dex" / "src" / "con_dex_helper.py"
+DEX_SRC_ROOT = Path(
+    os.environ.get("XIAN_DEX_SRC_DIR", WORKSPACE_ROOT / "xian-dex" / "src")
+).expanduser()
+DEX_PAIRS_PATH = DEX_SRC_ROOT / "con_pairs.py"
+DEX_ROUTER_PATH = DEX_SRC_ROOT / "con_dex.py"
+DEX_HELPER_PATH = DEX_SRC_ROOT / "con_dex_helper.py"
+DEX_LP_TOKEN_PATH = DEX_SRC_ROOT / "con_lp_token.py"
+REFLECTION_LP_TOKEN = "con_reflection_currency_lp"
 
 TOKEN_CODE = """
 balances = Hash(default_value=0)
@@ -58,10 +67,22 @@ def balance_of(address: str):
 """
 
 
+@unittest.skipUnless(
+    DEX_PAIRS_PATH.exists()
+    and DEX_ROUTER_PATH.exists()
+    and DEX_HELPER_PATH.exists()
+    and DEX_LP_TOKEN_PATH.exists(),
+    f"missing sibling xian-dex checkout or XIAN_DEX_SRC_DIR: {DEX_SRC_ROOT}",
+)
 class TestReflectionTokenWithDex(unittest.TestCase):
     def setUp(self):
-        self.client = ContractingClient()
+        self._storage_home = tempfile.TemporaryDirectory()
+        self.client = ContractingClient(
+            storage_home=Path(self._storage_home.name)
+        )
         self.client.flush()
+
+        self.operator = "sys"
 
         with DEX_PAIRS_PATH.open() as f:
             self.client.submit(f.read(), name="con_pairs")
@@ -69,6 +90,18 @@ class TestReflectionTokenWithDex(unittest.TestCase):
             self.client.submit(f.read(), name="con_dex")
         with DEX_HELPER_PATH.open() as f:
             self.client.submit(f.read(), name="con_dex_helper")
+        with DEX_LP_TOKEN_PATH.open() as f:
+            self.client.submit(
+                f.read(),
+                name=REFLECTION_LP_TOKEN,
+                constructor_args={
+                    "token_name": "Reflection / Currency LP",
+                    "token_symbol": "RFL-CUR-LP",
+                    "operator_address": self.operator,
+                    "minter_address": "con_pairs",
+                },
+                signer=self.operator,
+            )
         with REFLECTION_PATH.open() as f:
             self.client.submit(f.read(), name="con_reflection_token")
         self.client.submit(TOKEN_CODE, name="currency")
@@ -76,10 +109,10 @@ class TestReflectionTokenWithDex(unittest.TestCase):
         self.pairs = self.client.get_contract("con_pairs")
         self.dex = self.client.get_contract("con_dex")
         self.helper = self.client.get_contract("con_dex_helper")
+        self.lp_token = self.client.get_contract(REFLECTION_LP_TOKEN)
         self.reflection = self.client.get_contract("con_reflection_token")
         self.currency = self.client.get_contract("currency")
 
-        self.operator = "sys"
         self.lp = "a" * 64
         self.trader = "b" * 64
         self.now = Datetime(2026, 1, 1)
@@ -108,7 +141,11 @@ class TestReflectionTokenWithDex(unittest.TestCase):
             )
 
     def tearDown(self):
-        self.client.flush()
+        try:
+            self.client.flush()
+        finally:
+            self.client.raw_driver._store.close()
+            self._storage_home.cleanup()
 
     def assertAmountEqual(self, actual, expected):
         actual_value = ContractingDecimal(str(actual))
@@ -122,6 +159,7 @@ class TestReflectionTokenWithDex(unittest.TestCase):
         pair = self.pairs.createPair(
             tokenA="con_reflection_token",
             tokenB="currency",
+            lpToken=REFLECTION_LP_TOKEN,
             signer=self.operator,
         )
 
@@ -213,12 +251,7 @@ class TestReflectionTokenWithDex(unittest.TestCase):
         _, pair_id, add_liquidity = self.bootstrap_pair()
         liquidity = add_liquidity[2]
 
-        self.pairs.liqApprove(
-            pair=pair_id,
-            amount=liquidity,
-            to="con_dex",
-            signer=self.lp,
-        )
+        self.lp_token.approve(amount=liquidity, to="con_dex", signer=self.lp)
 
         reflection_before = self.reflection.balance_of(
             address=self.lp,
