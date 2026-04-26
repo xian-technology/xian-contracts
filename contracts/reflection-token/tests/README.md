@@ -14,3 +14,8 @@ Current coverage includes:
 - end-to-end DEX setup, liquidity add, buy flow, and sell flow
 - remove-liquidity behavior against a fee-target pair
 - helper-contract buy and sell flows
+
+The DEX integration test reads the hash-pinned DEX bundle from
+`xian-configs/solution-packs/dex/contract-bundle.json` by default. Set
+`XIAN_DEX_BUNDLE` for another bundle or `XIAN_DEX_SRC_DIR` only when testing
+unreleased DEX source.
