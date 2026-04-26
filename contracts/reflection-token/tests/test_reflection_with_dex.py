@@ -15,11 +15,7 @@ WORKSPACE_ROOT = Path(
 ).expanduser()
 REFLECTION_PATH = ROOT / "src" / "con_reflection_token.py"
 DEFAULT_DEX_BUNDLE_PATH = (
-    WORKSPACE_ROOT
-    / "xian-configs"
-    / "modules"
-    / "dex"
-    / "contract-bundle.json"
+    WORKSPACE_ROOT / "xian-configs" / "modules" / "dex" / "contract-bundle.json"
 )
 REFLECTION_LP_TOKEN = "con_reflection_currency_lp"
 
