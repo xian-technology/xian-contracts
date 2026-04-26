@@ -17,7 +17,7 @@ REFLECTION_PATH = ROOT / "src" / "con_reflection_token.py"
 DEFAULT_DEX_BUNDLE_PATH = (
     WORKSPACE_ROOT
     / "xian-configs"
-    / "solution-packs"
+    / "modules"
     / "dex"
     / "contract-bundle.json"
 )

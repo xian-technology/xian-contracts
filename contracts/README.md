@@ -37,6 +37,5 @@ This folder contains the curated contract packages in `xian-contracts`.
 
 - DEX moved to the sibling `xian-dex` repository, which now owns the canonical
   `con_pairs`, `con_dex`, `con_dex_helper`, LP token contract, tests, and web
-  frontend. Cross-contract fixtures should consume the pinned DEX solution-pack
-  bundle from `xian-configs` unless they are explicitly testing unreleased DEX
-  source.
+  frontend. Cross-contract fixtures should consume the pinned DEX module bundle
+  from `xian-configs` unless they are explicitly testing unreleased DEX source.
