@@ -41,6 +41,18 @@ This package fixes those points by:
 - escrowing the full stream deposit into the contract at creation time
 - using a sender nonce in the stream id
 
+```mermaid
+stateDiagram-v2
+  [*] --> Created: create stream and escrow deposit
+  Created --> Claimable: time accrues
+  Claimable --> Claimable: sender or receiver claims accrued value
+  Claimable --> Shortened: sender shortens close time
+  Claimable --> Forfeited: receiver forfeits future value
+  Shortened --> Closed: remaining value claimed or refunded
+  Forfeited --> Closed: refund and final claim settle
+  Claimable --> Closed: fully elapsed and claimed
+```
+
 ## Dependencies
 
 The streamed token contract must expose:

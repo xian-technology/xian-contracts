@@ -12,6 +12,19 @@ modules, solutions) lives in [`xian-configs`](../xian-configs). DEX
 contracts moved to [`xian-dex`](../xian-dex); only DEX-adjacent adapters and
 examples remain here.
 
+## Curation Shape
+
+```mermaid
+flowchart LR
+  Package["Contract package"] --> Source["src contract source"]
+  Package --> Tests["Package-local tests"]
+  Package --> Readme["Package README"]
+  Package --> Status["Maturity status"]
+  Runtime["xian-contracting"] --> Package
+  NetworkPackaging["xian-configs modules and solutions"] -. consumes canonical assets .-> Package
+  DEX["xian-dex"] -. owns canonical DEX .-> NetworkPackaging
+```
+
 ## Quick Start
 
 ```bash

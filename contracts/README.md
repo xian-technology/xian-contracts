@@ -9,6 +9,16 @@ This folder contains the curated contract packages in `xian-contracts`.
 - `tests/` for package-local tests or explicit testing notes
 - `README.md` in every package as the package entrypoint
 
+```mermaid
+flowchart LR
+  Package["Contract package"] --> Source["src"]
+  Package --> Tests["tests"]
+  Package --> Readme["README.md"]
+  Package --> Status["curated, candidate, or experimental"]
+  Source --> Validation["validate_contracts.py"]
+  Tests --> Pytest["pytest"]
+```
+
 ## Package Status
 
 - `curated`: documented and validated as a strong starting point

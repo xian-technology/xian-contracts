@@ -40,6 +40,17 @@ Fee-on-transfer reflection token designed to work with the Xian DEX.
   metadata stays in sync with fee burns, and metadata authority can be rotated
   with `change_operator(...)`.
 
+```mermaid
+flowchart LR
+  Wallet["Wallet transfer"] --> FeeCheck["Fee-target check"]
+  FeeCheck --> Reflection["Reflection fee accounting"]
+  Reflection --> Recipient["Post-fee recipient amount"]
+  Reflection --> Supply["Supply metadata"]
+  Pairs["con_pairs fee target"] --> FeeCheck
+  Router["con_dex supporting-fee path"] --> Pairs
+  Helper["con_dex_helper"] --> Router
+```
+
 ## Validation
 
 - repo-wide lint and compile checks

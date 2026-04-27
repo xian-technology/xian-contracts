@@ -41,6 +41,18 @@ Proof-backed shielded command pool for anonymous relayed contract execution.
   `shielded-scheduler-adapter` provide concrete `interact(...)` targets for
   useful app flows.
 
+```mermaid
+flowchart LR
+  Deposit["deposit_shielded"] --> Pool["Shielded escrow pool"]
+  Pool --> Command["execute_command"]
+  Prover["xian-zk command prover"] --> Command
+  Command --> Relayer["Relayer fee payment"]
+  Command --> Adapter["Allowlisted adapter target"]
+  Adapter --> App["Public app contract side effect"]
+  Command --> Change["Optional hidden change notes"]
+  Registry["zk_registry"] --> Command
+```
+
 ## Validation
 
 - repo-wide lint and compile checks

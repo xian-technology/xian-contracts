@@ -27,6 +27,16 @@ without embedding bespoke queue logic.
 - The contract stores payloads on-chain and replays them at execution
   time, so callers should avoid placing secrets in scheduled payloads.
 
+```mermaid
+stateDiagram-v2
+  [*] --> Scheduled: schedule action
+  Scheduled --> Cancelled: cancel before due
+  Scheduled --> Expired: expire after deadline
+  Scheduled --> Executing: execute when due
+  Executing --> Executed: target interact succeeds
+  Executing --> Scheduled: target call fails and state rolls back
+```
+
 ## Validation
 
 - repo-wide lint and compile checks

@@ -36,6 +36,23 @@ The contract exposes:
   `get_note_count`, `get_note_commitment`, `get_note_payload`,
   `list_note_commitments`, `list_note_records`
 
+```mermaid
+flowchart LR
+  PublicBalance["Public balance"] --> Deposit["deposit_shielded"]
+  Deposit --> Notes["Shielded note commitments"]
+  Notes --> Transfer["transfer_shielded"]
+  Transfer --> Notes
+  Notes --> Withdraw["withdraw_shielded"]
+  Withdraw --> PublicBalance
+  Wallet["xian-zk wallet and prover"] --> Deposit
+  Wallet --> Transfer
+  Wallet --> Withdraw
+  Registry["zk_registry"] --> Verify["Groth16 verification"]
+  Verify --> Deposit
+  Verify --> Transfer
+  Verify --> Withdraw
+```
+
 ## Design Notes
 
 - The contract binds all public proof inputs on-chain before calling
