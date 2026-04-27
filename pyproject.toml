@@ -3,7 +3,7 @@ name = "xian-contracts-hub"
 version = "0.1.0"
 description = "Curated contract hub for Xian"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 dependencies = [
     "xian-tech-accounts>=0.1.0,<1",
     "xian-tech-contracting[zk]>=1.0.1,<2",
@@ -31,7 +31,7 @@ markers = [
 
 [tool.ruff]
 line-length = 80
-target-version = "py312"
+target-version = "py314"
 extend-exclude = ["contracts/*/src"]
 
 [tool.ruff.lint]
