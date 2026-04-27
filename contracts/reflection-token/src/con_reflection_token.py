@@ -15,7 +15,6 @@ t_total = Variable(default_value=ZERO)
 reward_excluded_r_total = Variable(default_value=ZERO)
 reward_excluded_t_total = Variable(default_value=ZERO)
 approvals = Hash(default_value=ZERO)
-approved = Hash(default_value=ZERO)  # Legacy alias kept in sync with approvals
 operator = Variable()
 fee_targets = Hash(default_value=False)
 
@@ -92,14 +91,10 @@ def current_operator():
 def sync_allowance(owner: str, spender: str, amount):
     amount_value = to_decimal(amount)
     approvals[owner, spender] = amount_value
-    approved[owner, spender] = amount_value
 
 
 def get_allowance_value(owner: str, spender: str):
-    allowance_value = to_decimal(approvals[owner, spender])
-    if allowance_value == ZERO:
-        allowance_value = to_decimal(approved[owner, spender])
-    return allowance_value
+    return to_decimal(approvals[owner, spender])
 
 
 def sync_total_supply_metadata():

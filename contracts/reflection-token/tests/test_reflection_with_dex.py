@@ -91,7 +91,7 @@ DEX_LP_TOKEN_PATH = DEX_PATHS["lp_token_template"]
 
 TOKEN_CODE = """
 balances = Hash(default_value=0)
-approved = Hash(default_value=0)
+approvals = Hash(default_value=0)
 metadata = Hash()
 
 @construct
@@ -118,14 +118,14 @@ def transfer(amount: float, to: str):
 @export
 def approve(amount: float, to: str):
     assert amount >= 0
-    approved[ctx.caller, to] = amount
+    approvals[ctx.caller, to] = amount
 
 @export
 def transfer_from(amount: float, to: str, main_account: str):
     assert amount > 0
-    assert approved[main_account, ctx.caller] >= amount
+    assert approvals[main_account, ctx.caller] >= amount
     assert balances[main_account] >= amount
-    approved[main_account, ctx.caller] -= amount
+    approvals[main_account, ctx.caller] -= amount
     balances[main_account] -= amount
     balances[to] += amount
 

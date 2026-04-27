@@ -13,9 +13,7 @@ Fee-on-transfer reflection token designed to work with the Xian DEX.
 
 ## Notes
 
-- The contract now exposes the canonical XSC001 allowance hash as
-  `approvals`, while still keeping a legacy `approved` hash in sync for
-  compatibility with older local assumptions.
+- The contract exposes the canonical XSC001 allowance hash as `approvals`.
 - It now passes the package XSC001 interface checker and exposes
   `get_metadata()` for app/tooling reads.
 - Fees only apply when either party is marked as a fee target.
