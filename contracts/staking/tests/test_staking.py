@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 
-from contracting.client import ContractingClient
+from contracting.local import ContractingClient
 from xian_runtime_types.time import Datetime
 
 
@@ -57,10 +57,10 @@ def approve(amount: float, to: str):
         self.client.submit(test_token_code, name="con_fee_token")
 
         # Get contract instances
-        self.staking = self.client.get_contract("con_staking_test")
-        self.stake_token = self.client.get_contract("con_stake_token")
-        self.reward_token = self.client.get_contract("con_reward_token")
-        self.fee_token = self.client.get_contract("con_fee_token")
+        self.staking = self.client.get_contract_proxy("con_staking_test")
+        self.stake_token = self.client.get_contract_proxy("con_stake_token")
+        self.reward_token = self.client.get_contract_proxy("con_reward_token")
+        self.fee_token = self.client.get_contract_proxy("con_fee_token")
 
         # Set up test accounts
         self.creator = "creator"

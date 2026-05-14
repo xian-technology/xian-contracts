@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 
-from contracting.client import ContractingClient
+from contracting.local import ContractingClient
 from xian_runtime_types.time import Datetime
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -59,8 +59,8 @@ class TestWeightedLottery(unittest.TestCase):
         with CONTRACT_PATH.open() as f:
             self.client.submit(f.read(), name="con_weighted_lottery")
 
-        self.token = self.client.get_contract("con_ticket_token")
-        self.lottery = self.client.get_contract("con_weighted_lottery")
+        self.token = self.client.get_contract_proxy("con_ticket_token")
+        self.lottery = self.client.get_contract_proxy("con_weighted_lottery")
         self.alice = "a" * 64
         self.bob = "b" * 64
         self.carol = "c" * 64

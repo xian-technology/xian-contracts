@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 
-from contracting.client import ContractingClient
+from contracting.local import ContractingClient
 from xian_accounts import Ed25519Account
 from xian_runtime_types.time import Datetime
 
@@ -73,8 +73,8 @@ class TestStreamPayments(unittest.TestCase):
         with CONTRACT_PATH.open() as f:
             self.client.submit(f.read(), name="con_stream_payments")
 
-        self.token = self.client.get_contract("con_token")
-        self.streams = self.client.get_contract("con_stream_payments")
+        self.token = self.client.get_contract_proxy("con_token")
+        self.streams = self.client.get_contract_proxy("con_stream_payments")
 
         self.token.transfer(amount=500000, to=self.alice, signer="sys")
 

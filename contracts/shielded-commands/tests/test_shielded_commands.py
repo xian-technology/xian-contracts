@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 
 import pytest
-from contracting.client import ContractingClient
+from contracting.local import ContractingClient
 from xian_runtime_types.time import Datetime
 
 pytest.importorskip("xian_zk")
@@ -186,7 +186,7 @@ class TestShieldedCommands(unittest.TestCase):
                 name="zk_registry",
             )
 
-        self.registry = self.client.get_contract("zk_registry")
+        self.registry = self.client.get_contract_proxy("zk_registry")
         for entry in self.registry_manifest["registry_entries"]:
             args = dict(entry)
             args.pop("action", None)
@@ -205,10 +205,10 @@ class TestShieldedCommands(unittest.TestCase):
                 },
             )
 
-        self.token = self.client.get_contract("con_fee_token")
-        self.target = self.client.get_contract("con_shielded_target")
-        self.spend_target = self.client.get_contract("con_public_spend_target")
-        self.commands = self.client.get_contract("con_shielded_commands")
+        self.token = self.client.get_contract_proxy("con_fee_token")
+        self.target = self.client.get_contract_proxy("con_shielded_target")
+        self.spend_target = self.client.get_contract_proxy("con_public_spend_target")
+        self.commands = self.client.get_contract_proxy("con_shielded_commands")
         for binding in self.registry_manifest["configure_actions"]:
             self.commands.configure_vk(
                 action=binding["action"],

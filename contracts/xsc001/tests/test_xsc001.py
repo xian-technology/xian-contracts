@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 
-from contracting.client import ContractingClient
+from contracting.local import ContractingClient
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACT_PATH = ROOT / "src" / "con_xsc001.py"
@@ -97,7 +97,7 @@ class TestXSC001(unittest.TestCase):
         self.client.submit(VALID_TOKEN, name="con_valid_token")
         self.client.submit(INVALID_TOKEN, name="con_invalid_token")
 
-        self.standard = self.client.get_contract("con_xsc001")
+        self.standard = self.client.get_contract_proxy("con_xsc001")
 
     def tearDown(self):
         self.client.flush()

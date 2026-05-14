@@ -4,7 +4,7 @@ from functools import lru_cache
 from pathlib import Path
 
 import pytest
-from contracting.client import ContractingClient
+from contracting.local import ContractingClient
 from xian_runtime_types.time import Datetime
 
 pytest.importorskip("xian_zk")
@@ -251,7 +251,7 @@ class TestShieldedNoteToken(unittest.TestCase):
                 name="zk_registry",
             )
 
-        self.registry = self.client.get_contract("zk_registry")
+        self.registry = self.client.get_contract_proxy("zk_registry")
         for vk in self.fixture["verifying_keys"]:
             self.registry.register_vk(
                 vk_id=vk["vk_id"],
@@ -280,7 +280,7 @@ class TestShieldedNoteToken(unittest.TestCase):
                 constructor_args={"root_window_size": 3},
             )
 
-        self.token = self.client.get_contract("con_shielded_note_token")
+        self.token = self.client.get_contract_proxy("con_shielded_note_token")
         self.token.configure_vk(
             action="deposit",
             vk_id=self.fixture["verifying_keys"][0]["vk_id"],

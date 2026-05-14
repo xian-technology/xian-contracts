@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 
-from contracting.client import ContractingClient
+from contracting.local import ContractingClient
 from xian_runtime_types.time import Datetime
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -16,7 +16,7 @@ class TestTurnBasedGames(unittest.TestCase):
         with CONTRACT_PATH.open() as f:
             self.client.submit(f.read(), name="con_turn_based_games")
 
-        self.games = self.client.get_contract("con_turn_based_games")
+        self.games = self.client.get_contract_proxy("con_turn_based_games")
         self.alice = "a" * 64
         self.bob = "b" * 64
         self.now = Datetime(2026, 1, 1, 12, 0, 0)

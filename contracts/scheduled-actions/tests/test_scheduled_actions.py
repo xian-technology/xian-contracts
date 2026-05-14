@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 
-from contracting.client import ContractingClient
+from contracting.local import ContractingClient
 from xian_runtime_types.time import Datetime
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -45,8 +45,8 @@ class TestScheduledActions(unittest.TestCase):
         with CONTRACT_PATH.open() as f:
             self.client.submit(f.read(), name="con_scheduled_actions")
 
-        self.scheduler = self.client.get_contract("con_scheduled_actions")
-        self.target = self.client.get_contract("con_scheduled_target")
+        self.scheduler = self.client.get_contract_proxy("con_scheduled_actions")
+        self.target = self.client.get_contract_proxy("con_scheduled_target")
         self.alice = "a" * 64
         self.start = Datetime(2026, 1, 1, 12, 0, 0)
         self.run_at = Datetime(2026, 1, 1, 12, 5, 0)

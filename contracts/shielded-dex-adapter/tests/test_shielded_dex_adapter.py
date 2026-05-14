@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 
-from contracting.client import ContractingClient
+from contracting.local import ContractingClient
 from xian_runtime_types.time import Datetime
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -213,11 +213,11 @@ class TestShieldedDexAdapter(unittest.TestCase):
                 },
             )
 
-        self.input_token = self.client.get_contract("con_input_token")
-        self.output_token = self.client.get_contract("con_output_token")
-        self.controller = self.client.get_contract("con_mock_controller")
-        self.dex = self.client.get_contract("con_mock_dex")
-        self.adapter = self.client.get_contract("con_shielded_dex_adapter")
+        self.input_token = self.client.get_contract_proxy("con_input_token")
+        self.output_token = self.client.get_contract_proxy("con_output_token")
+        self.controller = self.client.get_contract_proxy("con_mock_controller")
+        self.dex = self.client.get_contract_proxy("con_mock_dex")
+        self.adapter = self.client.get_contract_proxy("con_shielded_dex_adapter")
 
         self.input_token.mint(
             amount=100, to="con_mock_controller", signer="sys"

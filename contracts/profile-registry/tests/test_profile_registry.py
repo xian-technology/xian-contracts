@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 
-from contracting.client import ContractingClient
+from contracting.local import ContractingClient
 from xian_runtime_types.time import Datetime
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -16,7 +16,7 @@ class TestProfileRegistry(unittest.TestCase):
         with CONTRACT_PATH.open() as f:
             self.client.submit(f.read(), name="con_profile_registry")
 
-        self.registry = self.client.get_contract("con_profile_registry")
+        self.registry = self.client.get_contract_proxy("con_profile_registry")
         self.alice = "a" * 64
         self.bob = "b" * 64
         self.carol = "c" * 64

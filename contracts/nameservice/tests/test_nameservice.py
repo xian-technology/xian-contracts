@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 
-from contracting.client import ContractingClient
+from contracting.local import ContractingClient
 from xian_runtime_types.time import Datetime
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -44,8 +44,8 @@ class TestNameservice(unittest.TestCase):
         with CONTRACT_PATH.open() as f:
             self.client.submit(f.read(), name="con_nameservice")
 
-        self.nameservice = self.client.get_contract("con_nameservice")
-        self.currency = self.client.get_contract("currency")
+        self.nameservice = self.client.get_contract_proxy("con_nameservice")
+        self.currency = self.client.get_contract_proxy("currency")
 
         self.manager = "sys"
         self.alice = "a" * 64

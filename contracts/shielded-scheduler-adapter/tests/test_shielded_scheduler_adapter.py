@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 
-from contracting.client import ContractingClient
+from contracting.local import ContractingClient
 from xian_runtime_types.time import Datetime
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -57,11 +57,11 @@ class TestShieldedSchedulerAdapter(unittest.TestCase):
             )
         self.client.submit(TARGET_CODE, name="con_adapter_target")
 
-        self.scheduler = self.client.get_contract("con_scheduled_actions")
-        self.adapter = self.client.get_contract(
+        self.scheduler = self.client.get_contract_proxy("con_scheduled_actions")
+        self.adapter = self.client.get_contract_proxy(
             "con_shielded_scheduler_adapter"
         )
-        self.target = self.client.get_contract("con_adapter_target")
+        self.target = self.client.get_contract_proxy("con_adapter_target")
         self.scheduler.set_target_allowed(
             target_contract="con_adapter_target",
             enabled=True,

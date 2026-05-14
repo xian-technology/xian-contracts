@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 
-from contracting.client import ContractingClient
+from contracting.local import ContractingClient
 from xian_runtime_types.decimal import ContractingDecimal
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -21,8 +21,8 @@ class TestReflectionToken(unittest.TestCase):
         with XSC001_PATH.open() as f:
             self.client.submit(f.read(), name="con_xsc001")
 
-        self.token = self.client.get_contract("con_reflection_token")
-        self.standard = self.client.get_contract("con_xsc001")
+        self.token = self.client.get_contract_proxy("con_reflection_token")
+        self.standard = self.client.get_contract_proxy("con_xsc001")
         self.operator = "sys"
         self.alice = "a" * 64
         self.bob = "b" * 64
