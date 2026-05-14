@@ -207,7 +207,9 @@ class TestShieldedCommands(unittest.TestCase):
 
         self.token = self.client.get_contract_proxy("con_fee_token")
         self.target = self.client.get_contract_proxy("con_shielded_target")
-        self.spend_target = self.client.get_contract_proxy("con_public_spend_target")
+        self.spend_target = self.client.get_contract_proxy(
+            "con_public_spend_target"
+        )
         self.commands = self.client.get_contract_proxy("con_shielded_commands")
         for binding in self.registry_manifest["configure_actions"]:
             self.commands.configure_vk(

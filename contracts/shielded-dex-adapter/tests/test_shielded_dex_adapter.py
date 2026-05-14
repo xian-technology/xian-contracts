@@ -217,7 +217,9 @@ class TestShieldedDexAdapter(unittest.TestCase):
         self.output_token = self.client.get_contract_proxy("con_output_token")
         self.controller = self.client.get_contract_proxy("con_mock_controller")
         self.dex = self.client.get_contract_proxy("con_mock_dex")
-        self.adapter = self.client.get_contract_proxy("con_shielded_dex_adapter")
+        self.adapter = self.client.get_contract_proxy(
+            "con_shielded_dex_adapter"
+        )
 
         self.input_token.mint(
             amount=100, to="con_mock_controller", signer="sys"
