@@ -12,6 +12,20 @@ MAX_CONTENT_HASH_LENGTH = 128
 MAX_PROOF_LENGTH = 512
 MAX_CHUNK_LENGTH = 8192
 MAX_CHUNK_COUNT = 64
+MAX_PALETTE_ID_LENGTH = 64
+MAX_PALETTE_NAME_LENGTH = 128
+MAX_PALETTE_SIZE = 64
+MAX_COLOR_LENGTH = 11
+MAX_PIXEL_DIMENSION = 512
+MAX_PIXEL_DATA_LENGTH = 8192
+MAX_FRAME_COUNT = 64
+MAX_FRAME_DELAY_MS = 10000
+
+PIXEL_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_-"
+PIXELGRID_SCHEMA = "xian.pixelgrid.v1"
+PIXELGRID_MIME_TYPE = "application/x.xian.pixelgrid"
+PIXELGRID_ENCODING = "palette-index-64"
+HEX_CHARS = "0123456789abcdef"
 
 RESERVED_COLLECTION_KEYS = [
     "standard",
@@ -25,6 +39,13 @@ RESERVED_TOKEN_FIELDS = [
     "content_locked",
     "chunk_count",
     "likes",
+    "render_schema",
+    "palette_id",
+    "width",
+    "height",
+    "frame_count",
+    "frame_delay_ms",
+    "pixel_encoding",
 ]
 
 TOKEN_PAYMENT_INTERFACE = [
@@ -44,6 +65,7 @@ token_data = Hash(default_value="")
 content_chunks = Hash(default_value="")
 likes = Hash(default_value=False)
 listings = Hash(default_value="")
+palettes = Hash(default_value="")
 
 TransferEvent = LogEvent(
     "Transfer",
@@ -109,6 +131,14 @@ TokenLikedEvent = LogEvent(
         "token_id": {"type": str, "idx": True},
         "account": {"type": str, "idx": True},
         "likes": {"type": int},
+    },
+)
+
+PaletteUpdatedEvent = LogEvent(
+    "PaletteUpdated",
+    {
+        "palette_id": {"type": str, "idx": True},
+        "key": {"type": str},
     },
 )
 
@@ -185,6 +215,112 @@ def validate_token_id(token_id: str):
     for character in token_id:
         assert character != ":" and character != ".", "token_id contains invalid characters."
     return token_id
+
+
+def validate_palette_id(palette_id: str):
+    assert isinstance(palette_id, str) and palette_id != "", (
+        "palette_id must be non-empty."
+    )
+    assert len(palette_id) <= MAX_PALETTE_ID_LENGTH, "palette_id is too long."
+    for character in palette_id:
+        assert character != ":" and character != ".", (
+            "palette_id contains invalid characters."
+        )
+    return palette_id
+
+
+def normalize_color(color: str):
+    assert isinstance(color, str), "color must be a string."
+    assert color != "", "color must be non-empty."
+    assert len(color) <= MAX_COLOR_LENGTH, "color is too long."
+
+    normalized = color.lower()
+    if normalized == "transparent":
+        return normalized
+
+    assert normalized[0] == "#", "color must be hex or transparent."
+    assert len(normalized) == 4 or len(normalized) == 7 or len(normalized) == 9, (
+        "color must be #rgb, #rrggbb, #rrggbbaa, or transparent."
+    )
+    for index in range(1, len(normalized)):
+        assert normalized[index] in HEX_CHARS, "color contains invalid hex."
+    return normalized
+
+
+def require_palette(palette_id: str):
+    validate_palette_id(palette_id)
+    size = palettes[palette_id, "size"]
+    assert size != "" and size > 0, "Palette does not exist."
+    return size
+
+
+def require_unlocked_palette(palette_id: str):
+    assert palettes[palette_id, "locked"] is not True, "Palette is locked."
+
+
+def palette_index_for(character: str):
+    for index in range(len(PIXEL_ALPHABET)):
+        if PIXEL_ALPHABET[index] == character:
+            return index
+    assert False, "Pixel data contains invalid palette index."
+
+
+def validate_pixel_grid(
+    palette_id: str,
+    width: int,
+    height: int,
+    frame_count: int,
+    frame_delay_ms: int,
+    pixels: str,
+):
+    palette_size = require_palette(palette_id)
+    assert palettes[palette_id, "locked"] is True, "Palette must be locked before mint."
+    assert width > 0 and width <= MAX_PIXEL_DIMENSION, "width is out of range."
+    assert height > 0 and height <= MAX_PIXEL_DIMENSION, "height is out of range."
+    assert frame_count > 0 and frame_count <= MAX_FRAME_COUNT, (
+        "frame_count is out of range."
+    )
+    assert frame_delay_ms >= 0 and frame_delay_ms <= MAX_FRAME_DELAY_MS, (
+        "frame_delay_ms is out of range."
+    )
+    if frame_count > 1:
+        assert frame_delay_ms > 0, "Animated pixel grids need a frame delay."
+
+    assert isinstance(pixels, str), "pixels must be a string."
+    total_pixels = width * height * frame_count
+    assert total_pixels <= MAX_PIXEL_DATA_LENGTH, "Pixel data is too large."
+    assert len(pixels) == total_pixels, "Pixel data length does not match dimensions."
+
+    for character in pixels:
+        assert palette_index_for(character) < palette_size, (
+            "Pixel data references a missing palette color."
+        )
+    return total_pixels
+
+
+def pixel_grid_hash_source(
+    palette_id: str,
+    width: int,
+    height: int,
+    frame_count: int,
+    frame_delay_ms: int,
+    pixels: str,
+):
+    return (
+        PIXELGRID_SCHEMA
+        + ":"
+        + palette_id
+        + ":"
+        + str(width)
+        + ":"
+        + str(height)
+        + ":"
+        + str(frame_count)
+        + ":"
+        + str(frame_delay_ms)
+        + ":"
+        + pixels
+    )
 
 
 def require_token(token_id: str):
@@ -359,6 +495,76 @@ def change_operator(new_operator: str):
 
 
 @export
+def create_palette(
+    palette_id: str,
+    colors: list,
+    name: str = "",
+    locked: bool = True,
+):
+    require_operator()
+    validate_palette_id(palette_id)
+    assert palettes[palette_id, "size"] == "", "Palette already exists."
+    assert isinstance(colors, list), "colors must be a list."
+    assert len(colors) > 0 and len(colors) <= MAX_PALETTE_SIZE, (
+        "colors length is out of range."
+    )
+
+    palettes[palette_id, "name"] = normalize_text(
+        name,
+        "palette_name",
+        MAX_PALETTE_NAME_LENGTH,
+    )
+    palettes[palette_id, "creator"] = ctx.caller
+    palettes[palette_id, "created"] = now
+    palettes[palette_id, "locked"] = False
+    for index in range(len(colors)):
+        palettes[palette_id, index] = normalize_color(colors[index])
+    palettes[palette_id, "size"] = len(colors)
+    palettes[palette_id, "locked"] = locked is True
+
+    PaletteUpdatedEvent({"palette_id": palette_id, "key": "create"})
+    return palette_id
+
+
+@export
+def set_palette_color(palette_id: str, index: int, color: str):
+    require_operator()
+    size = require_palette(palette_id)
+    require_unlocked_palette(palette_id)
+    assert index >= 0 and index < size, "Palette index is out of range."
+    palettes[palette_id, index] = normalize_color(color)
+    PaletteUpdatedEvent({"palette_id": palette_id, "key": "color"})
+
+
+@export
+def lock_palette(palette_id: str):
+    require_operator()
+    require_palette(palette_id)
+    palettes[palette_id, "locked"] = True
+    PaletteUpdatedEvent({"palette_id": palette_id, "key": "locked"})
+
+
+@export
+def palette_info(palette_id: str):
+    size = require_palette(palette_id)
+    return {
+        "palette_id": palette_id,
+        "name": palettes[palette_id, "name"],
+        "size": size,
+        "locked": palettes[palette_id, "locked"],
+        "creator": palettes[palette_id, "creator"],
+        "created": palettes[palette_id, "created"],
+    }
+
+
+@export
+def palette_color(palette_id: str, index: int):
+    size = require_palette(palette_id)
+    assert index >= 0 and index < size, "Palette index is out of range."
+    return palettes[palette_id, index]
+
+
+@export
 def mint(
     token_id: str,
     to: str,
@@ -398,6 +604,67 @@ def mint(
         True,
     )
     token_data[token_id, "content"] = normalized_content
+    return token_id
+
+
+@export
+def mint_pixel_grid(
+    token_id: str,
+    to: str,
+    name: str,
+    palette_id: str,
+    width: int,
+    height: int,
+    frame_count: int,
+    frame_delay_ms: int,
+    pixels: str,
+    description: str = "",
+    royalty_receiver: str = "",
+    royalty_bps: int = 0,
+):
+    require_operator()
+    normalized_pixels = normalize_text(pixels, "pixels", MAX_PIXEL_DATA_LENGTH)
+    validate_pixel_grid(
+        palette_id,
+        width,
+        height,
+        frame_count,
+        frame_delay_ms,
+        normalized_pixels,
+    )
+
+    store_common_metadata(
+        token_id,
+        to,
+        name,
+        description,
+        PIXELGRID_MIME_TYPE,
+        PIXELGRID_ENCODING,
+        "",
+        hashlib.sha256(
+            pixel_grid_hash_source(
+                palette_id,
+                width,
+                height,
+                frame_count,
+                frame_delay_ms,
+                normalized_pixels,
+            )
+        ),
+        royalty_receiver,
+        royalty_bps,
+        0,
+        True,
+    )
+    token_data[token_id, "content"] = normalized_pixels
+    token_data[token_id, "render_schema"] = PIXELGRID_SCHEMA
+    token_data[token_id, "palette_id"] = palette_id
+    token_data[token_id, "width"] = width
+    token_data[token_id, "height"] = height
+    token_data[token_id, "frame_count"] = frame_count
+    token_data[token_id, "frame_delay_ms"] = frame_delay_ms
+    token_data[token_id, "pixel_encoding"] = PIXELGRID_ENCODING
+    MetadataUpdateEvent({"token_id": token_id, "key": "pixel_grid"})
     return token_id
 
 
@@ -580,6 +847,33 @@ def token_metadata(token_id: str):
         "royalty_bps": token_data[token_id, "royalty_bps"],
         "likes": token_data[token_id, "likes"],
         "proof": token_data[token_id, "proof"],
+        "render_schema": token_data[token_id, "render_schema"],
+        "palette_id": token_data[token_id, "palette_id"],
+        "width": token_data[token_id, "width"],
+        "height": token_data[token_id, "height"],
+        "frame_count": token_data[token_id, "frame_count"],
+        "frame_delay_ms": token_data[token_id, "frame_delay_ms"],
+        "pixel_encoding": token_data[token_id, "pixel_encoding"],
+    }
+
+
+@export
+def pixel_grid_info(token_id: str):
+    require_token(token_id)
+    assert token_data[token_id, "render_schema"] == PIXELGRID_SCHEMA, (
+        "Token is not a pixel grid."
+    )
+    return {
+        "token_id": token_id,
+        "render_schema": token_data[token_id, "render_schema"],
+        "palette_id": token_data[token_id, "palette_id"],
+        "width": token_data[token_id, "width"],
+        "height": token_data[token_id, "height"],
+        "frame_count": token_data[token_id, "frame_count"],
+        "frame_delay_ms": token_data[token_id, "frame_delay_ms"],
+        "pixel_encoding": token_data[token_id, "pixel_encoding"],
+        "content": token_data[token_id, "content"],
+        "content_hash": token_data[token_id, "content_hash"],
     }
 
 

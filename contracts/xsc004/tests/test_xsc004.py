@@ -132,6 +132,115 @@ class TestXSC004(unittest.TestCase):
             hashlib.sha256(metadata["content"].encode()).hexdigest(),
         )
 
+    def test_custom_palette_pixel_grid_mint_stores_render_metadata(self):
+        self.nft.create_palette(
+            palette_id="neon",
+            colors=["#000000", "#ff00aa", "#00ffff", "transparent"],
+            name="Neon",
+            locked=True,
+            signer=self.operator,
+        )
+
+        pixels = "0123012301230123"
+        self.nft.mint_pixel_grid(
+            token_id="grid-1",
+            to=self.alice,
+            name="Neon Grid",
+            description="Two-frame custom-palette pixel art.",
+            palette_id="neon",
+            width=4,
+            height=2,
+            frame_count=2,
+            frame_delay_ms=120,
+            pixels=pixels,
+            signer=self.operator,
+        )
+
+        palette = self.nft.palette_info(palette_id="neon")
+        metadata = self.nft.token_metadata(token_id="grid-1")
+        pixel_grid = self.nft.pixel_grid_info(token_id="grid-1")
+
+        self.assertEqual(palette["size"], 4)
+        self.assertEqual(palette["locked"], True)
+        self.assertEqual(self.nft.palette_color(palette_id="neon", index=1), "#ff00aa")
+        self.assertEqual(metadata["mime_type"], "application/x.xian.pixelgrid")
+        self.assertEqual(metadata["render_schema"], "xian.pixelgrid.v1")
+        self.assertEqual(metadata["palette_id"], "neon")
+        self.assertEqual(metadata["width"], 4)
+        self.assertEqual(metadata["height"], 2)
+        self.assertEqual(metadata["frame_count"], 2)
+        self.assertEqual(metadata["frame_delay_ms"], 120)
+        self.assertEqual(metadata["pixel_encoding"], "palette-index-64")
+        self.assertEqual(pixel_grid["content"], pixels)
+        hash_source = "xian.pixelgrid.v1:neon:4:2:2:120:" + pixels
+        self.assertEqual(
+            pixel_grid["content_hash"],
+            hashlib.sha256(hash_source.encode()).hexdigest(),
+        )
+
+        self.nft.transfer(token_id="grid-1", to=self.bob, signer=self.alice)
+        self.assertEqual(self.nft.owner_of(token_id="grid-1"), self.bob)
+
+    def test_pixel_grid_requires_locked_palette_and_valid_indexes(self):
+        self.nft.create_palette(
+            palette_id="draft",
+            colors=["#000", "#fff"],
+            name="Draft",
+            locked=False,
+            signer=self.operator,
+        )
+        self.nft.set_palette_color(
+            palette_id="draft",
+            index=1,
+            color="#ff00aa",
+            signer=self.operator,
+        )
+
+        with self.assertRaises(AssertionError):
+            self.nft.mint_pixel_grid(
+                token_id="unlocked-grid",
+                to=self.alice,
+                name="Unlocked Grid",
+                palette_id="draft",
+                width=2,
+                height=1,
+                frame_count=1,
+                frame_delay_ms=0,
+                pixels="01",
+                signer=self.operator,
+            )
+
+        self.nft.lock_palette(palette_id="draft", signer=self.operator)
+
+        with self.assertRaises(AssertionError):
+            self.nft.set_palette_color(
+                palette_id="draft",
+                index=1,
+                color="#00ffff",
+                signer=self.operator,
+            )
+
+        with self.assertRaises(AssertionError):
+            self.nft.mint_pixel_grid(
+                token_id="bad-grid",
+                to=self.alice,
+                name="Bad Grid",
+                palette_id="draft",
+                width=2,
+                height=1,
+                frame_count=1,
+                frame_delay_ms=0,
+                pixels="02",
+                signer=self.operator,
+            )
+
+        with self.assertRaises(AssertionError):
+            self.nft.create_palette(
+                palette_id="bad-colors",
+                colors=["red"],
+                signer=self.operator,
+            )
+
     def test_owner_transfer_and_approval_transfer_clear_approval(self):
         self.mint_inline()
 

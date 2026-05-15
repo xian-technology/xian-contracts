@@ -9,7 +9,8 @@ ships a reference implementation for single-contract NFT collections.
 
 - `src/con_xsc004.py`: on-chain interface checker for XSC-0004 collections
 - `src/con_xsc004_nft.py`: reference collection implementation with on-chain
-  media, approvals, royalties, listings, likes, and owner proofs
+  media, optional PixelGrid palettes, approvals, royalties, listings, likes,
+  and owner proofs
 - `tests/test_xsc004.py`: package-local behavior and compatibility tests
 
 ## Standard Surface
@@ -40,6 +41,13 @@ The reference implementation supports arbitrary media by storing MIME type,
 encoding, inline content, content hash, and optional chunks. Pixel art,
 animations, SVGs, JSON, and base64 payloads are all collection-level choices,
 not constraints of the standard.
+
+Pixel-Frames-style art can use the optional PixelGrid extension in
+`con_xsc004_nft.py`. Collections define custom palettes with up to 64 colors,
+lock those palettes for immutability, then mint compact pixel grids where each
+pixel is a single `palette-index-64` character. The palette extension is
+validated on-chain but remains additive; ordinary XSC-0004 wallets can still
+read ownership and generic token metadata without understanding PixelGrid.
 
 Marketplace behavior is intentionally an extension. `con_xsc004_nft.py`
 includes listing, buying, and royalty helpers because they are useful for
