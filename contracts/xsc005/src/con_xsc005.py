@@ -31,14 +31,14 @@ REQUIRED_METADATA = (
 
 
 @export
-def is_XSC004(contract: str):
+def is_XSC005(contract: str):
     nft = I.import_module(contract)
     contract_metadata = ForeignHash(foreign_contract=contract, foreign_name="metadata")
 
     if not I.enforce_interface(nft, REQUIRED_INTERFACE):
         return False
 
-    if contract_metadata["standard"] != "XSC-0004":
+    if contract_metadata["standard"] != "XSC-0005":
         return False
 
     for field in REQUIRED_METADATA:

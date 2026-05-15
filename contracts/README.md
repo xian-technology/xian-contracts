@@ -42,7 +42,7 @@ flowchart LR
 - `turn-based-games/`: generic turn-based match registry
 - `weighted-lottery/`: ticket-weighted lottery example
 - `xsc001/`: token interface checker
-- `xsc004/`: non-fungible token interface checker and reference collection
+- `xsc005/`: non-fungible token interface checker and reference collection
 
 ## Moved Packages
 

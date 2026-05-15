@@ -5,8 +5,8 @@ from pathlib import Path
 from contracting.local import ContractingClient
 
 ROOT = Path(__file__).resolve().parents[1]
-CHECKER_PATH = ROOT / "src" / "con_xsc004.py"
-REFERENCE_PATH = ROOT / "src" / "con_xsc004_nft.py"
+CHECKER_PATH = ROOT / "src" / "con_xsc005.py"
+REFERENCE_PATH = ROOT / "src" / "con_xsc005_nft.py"
 
 PAYMENT_TOKEN = """
 balances = Hash(default_value=0)
@@ -49,7 +49,7 @@ metadata = Hash()
 
 @construct
 def seed():
-    metadata["standard"] = "XSC-0004"
+    metadata["standard"] = "XSC-0005"
     metadata["collection_name"] = "Broken"
     metadata["collection_symbol"] = "BAD"
     metadata["collection_description"] = "Missing required surface"
@@ -60,18 +60,18 @@ def owner_of(token_id: str):
 """
 
 
-class TestXSC004(unittest.TestCase):
+class TestXSC005(unittest.TestCase):
     def setUp(self):
         self.client = ContractingClient()
         self.client.flush()
 
         self.client.submit(PAYMENT_TOKEN, name="currency")
         with CHECKER_PATH.open() as f:
-            self.client.submit(f.read(), name="con_xsc004")
+            self.client.submit(f.read(), name="con_xsc005")
         with REFERENCE_PATH.open() as f:
             self.client.submit(
                 f.read(),
-                name="con_xsc004_nft",
+                name="con_xsc005_nft",
                 constructor_args={
                     "collection_name": "Pixel Frames Next",
                     "collection_symbol": "PXN",
@@ -80,8 +80,8 @@ class TestXSC004(unittest.TestCase):
             )
         self.client.submit(INVALID_NFT, name="con_invalid_nft")
 
-        self.standard = self.client.get_contract_proxy("con_xsc004")
-        self.nft = self.client.get_contract_proxy("con_xsc004_nft")
+        self.standard = self.client.get_contract_proxy("con_xsc005")
+        self.nft = self.client.get_contract_proxy("con_xsc005_nft")
         self.currency = self.client.get_contract_proxy("currency")
 
         self.operator = "sys"
@@ -109,12 +109,12 @@ class TestXSC004(unittest.TestCase):
             signer=self.operator,
         )
 
-    def test_reference_contract_passes_xsc004_checker(self):
+    def test_reference_contract_passes_xsc005_checker(self):
         self.assertTrue(
-            self.standard.is_XSC004(contract="con_xsc004_nft", signer="sys")
+            self.standard.is_XSC005(contract="con_xsc005_nft", signer="sys")
         )
         self.assertFalse(
-            self.standard.is_XSC004(contract="con_invalid_nft", signer="sys")
+            self.standard.is_XSC005(contract="con_invalid_nft", signer="sys")
         )
 
     def test_mint_stores_on_chain_content_and_metadata(self):
@@ -326,7 +326,7 @@ class TestXSC004(unittest.TestCase):
     def test_marketplace_purchase_pays_seller_and_royalty(self):
         self.mint_inline()
         self.currency.transfer(amount=1000, to=self.bob, signer=self.operator)
-        self.currency.approve(amount=100, to="con_xsc004_nft", signer=self.bob)
+        self.currency.approve(amount=100, to="con_xsc005_nft", signer=self.bob)
 
         self.nft.list_for_sale(
             token_id="pixel-1",

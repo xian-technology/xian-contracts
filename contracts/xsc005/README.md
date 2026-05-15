@@ -1,17 +1,17 @@
-# XSC004 NFT
+# XSC005 NFT
 
 Status: `candidate`
 
-This package defines the XSC-0004 non-fungible token standard for Xian and
+This package defines the XSC-0005 non-fungible token standard for Xian and
 ships a reference implementation for single-contract NFT collections.
 
 ## Files
 
-- `src/con_xsc004.py`: on-chain interface checker for XSC-0004 collections
-- `src/con_xsc004_nft.py`: reference collection implementation with on-chain
+- `src/con_xsc005.py`: on-chain interface checker for XSC-0005 collections
+- `src/con_xsc005_nft.py`: reference collection implementation with on-chain
   media, optional PixelGrid palettes, approvals, royalties, listings, likes,
   and owner proofs
-- `tests/test_xsc004.py`: package-local behavior and compatibility tests
+- `tests/test_xsc005.py`: package-local behavior and compatibility tests
 
 ## Standard Surface
 
@@ -31,7 +31,7 @@ and `MetadataUpdate` events for indexers and wallets.
 
 ## Design Notes
 
-XSC-0004 keeps the core NFT model in one contract by default. The Pixel Frames
+XSC-0005 keeps the core NFT model in one contract by default. The Pixel Frames
 contracts that motivated this package split controller logic from item data,
 but that shape creates a second public mutation surface unless every companion
 setter is authenticated. A single contract is simpler to audit and easier for
@@ -43,15 +43,15 @@ animations, SVGs, JSON, and base64 payloads are all collection-level choices,
 not constraints of the standard.
 
 Pixel-Frames-style art can use the optional PixelGrid extension in
-`con_xsc004_nft.py`. Collections define custom palettes with up to 64 colors,
+`con_xsc005_nft.py`. Collections define custom palettes with up to 64 colors,
 lock those palettes for immutability, then mint compact pixel grids where each
 pixel is a single `palette-index-64` character. The palette extension is
-validated on-chain but remains additive; ordinary XSC-0004 wallets can still
+validated on-chain but remains additive; ordinary XSC-0005 wallets can still
 read ownership and generic token metadata without understanding PixelGrid.
 
-Marketplace behavior is intentionally an extension. `con_xsc004_nft.py`
+Marketplace behavior is intentionally an extension. `con_xsc005_nft.py`
 includes listing, buying, and royalty helpers because they are useful for
-Pixel-Frames-like collections, but XSC-0004 compliance only depends on the core
+Pixel-Frames-like collections, but XSC-0005 compliance only depends on the core
 NFT surface.
 
 ## Validation
@@ -60,5 +60,5 @@ Run from `xian-contracts`:
 
 ```bash
 uv run python scripts/validate_contracts.py
-uv run pytest contracts/xsc004/tests/test_xsc004.py
+uv run pytest contracts/xsc005/tests/test_xsc005.py
 ```

@@ -145,7 +145,7 @@ PaletteUpdatedEvent = LogEvent(
 
 @construct
 def seed(
-    collection_name: str = "XSC004 NFT",
+    collection_name: str = "XSC005 NFT",
     collection_symbol: str = "NFT",
     collection_description: str = "",
     collection_image: str = "",
@@ -156,7 +156,7 @@ def seed(
         operator_address = ctx.caller
 
     collection_operator.set(operator_address)
-    metadata["standard"] = "XSC-0004"
+    metadata["standard"] = "XSC-0005"
     metadata["collection_name"] = normalize_text(
         collection_name,
         "collection_name",
