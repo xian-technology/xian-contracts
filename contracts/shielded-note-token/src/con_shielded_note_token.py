@@ -52,7 +52,7 @@ def field_hex_from_int(value: int):
 
 def field_int_from_text(value: str):
     assert isinstance(value, str) and value != "", "Value must be a string!"
-    return int(hashlib.sha3(value), 16) % FIELD_MODULUS
+    return int(hashlib.sha3_text(value), 16) % FIELD_MODULUS
 
 
 def field_hex_from_text(value: str):

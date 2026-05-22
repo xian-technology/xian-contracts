@@ -163,7 +163,7 @@ def require_token(token_contract: str):
 
 def stream_id_for(sender: str, receiver: str, token_contract: str, begins, closes, rate):
     nonce = sender_nonces[sender]
-    return hashlib.sha3(
+    return hashlib.sha3_text(
         f"{sender}:{receiver}:{token_contract}:{begins}:{closes}:{rate}:{nonce}"
     )
 
@@ -352,7 +352,7 @@ def create_stream_from_permit(
         closes=closes_time,
         deadline=deadline_time,
     )
-    permit_hash = hashlib.sha3(permit_msg)
+    permit_hash = hashlib.sha3_text(permit_msg)
 
     assert permits[permit_hash] is None, "Permit can only be used once."
     assert crypto.verify(sender, permit_msg, signature), "Invalid signature."

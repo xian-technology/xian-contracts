@@ -108,7 +108,7 @@ def require_token_contract(token_contract: str):
 
 
 def initial_entropy(lottery_id: int, creator: str, token_contract: str, ticket_price, close_at, metadata_uri: str):
-    return hashlib.sha3(
+    return hashlib.sha3_text(
         "|".join(
             [
                 str(lottery_id),
@@ -124,7 +124,7 @@ def initial_entropy(lottery_id: int, creator: str, token_contract: str, ticket_p
 
 
 def update_entropy(current_entropy: str, buyer: str, ticket_count: int, buyer_entropy: str):
-    return hashlib.sha3(
+    return hashlib.sha3_text(
         "|".join(
             [
                 current_entropy,
@@ -138,7 +138,7 @@ def update_entropy(current_entropy: str, buyer: str, ticket_count: int, buyer_en
 
 
 def draw_entropy(lottery_id: int):
-    return hashlib.sha3(
+    return hashlib.sha3_text(
         "|".join(
             [
                 str(lottery_id),

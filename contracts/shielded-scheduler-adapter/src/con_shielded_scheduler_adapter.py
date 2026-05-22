@@ -98,7 +98,7 @@ def scheduler_module():
 
 
 def owner_commitment_hash(owner_commitment: str):
-    return hashlib.sha3(
+    return hashlib.sha3_text(
         normalize_text(owner_commitment, "owner_commitment", MAX_TEXT_LENGTH)
     )
 

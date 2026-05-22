@@ -124,7 +124,7 @@ def canonicalize(value: Any):
 
 
 def payload_digest(payload: dict):
-    return hashlib.sha3(canonicalize(normalize_payload(payload)))
+    return hashlib.sha3_text(canonicalize(normalize_payload(payload)))
 
 
 def require_target_contract(target_contract: str):

@@ -583,7 +583,7 @@ def mint(
         content_hash = ""
     normalized_content = normalize_text(content, "content", MAX_CONTENT_LENGTH)
     if normalized_content != "":
-        computed_hash = hashlib.sha256(normalized_content)
+        computed_hash = hashlib.sha256_text(normalized_content)
         if content_hash == "":
             content_hash = computed_hash
         else:
@@ -641,7 +641,7 @@ def mint_pixel_grid(
         PIXELGRID_MIME_TYPE,
         PIXELGRID_ENCODING,
         "",
-        hashlib.sha256(
+        hashlib.sha256_text(
             pixel_grid_hash_source(
                 palette_id,
                 width,
