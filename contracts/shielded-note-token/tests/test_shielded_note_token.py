@@ -1172,6 +1172,7 @@ class TestShieldedNoteToken(unittest.TestCase):
     @pytest.mark.slow
     def test_relay_transfer_hides_sender_and_pays_relayer(self):
         chain_id = "xian-local-1"
+        relayer = "ab" * 32
         relay_expiry = Datetime(2026, 1, 1, 12, 30, 0)
         relay_now = Datetime(2026, 1, 1, 12, 5, 0)
         asset_id = self.token.asset_id(signer="sys")
@@ -1210,7 +1211,7 @@ class TestShieldedNoteToken(unittest.TestCase):
         plan = alice_wallet.build_relay_transfer(
             recipient=bob_wallet.recipient,
             amount=25,
-            relayer="relayer",
+            relayer=relayer,
             chain_id=chain_id,
             fee=4,
             expires_at=relay_expiry,
@@ -1220,7 +1221,7 @@ class TestShieldedNoteToken(unittest.TestCase):
         proof = self.relay_prover.prove_relay_transfer(plan.request)
         relay_hashes = self.token.hash_relay_transfer(
             input_nullifiers=proof.input_nullifiers,
-            relayer="relayer",
+            relayer=relayer,
             relayer_fee=4,
             expires_at=relay_expiry,
             signer="sys",
@@ -1239,14 +1240,14 @@ class TestShieldedNoteToken(unittest.TestCase):
             relayer_fee=4,
             expires_at=relay_expiry,
             output_payloads=plan.output_payloads,
-            signer="relayer",
+            signer=relayer,
             environment={"chain_id": chain_id, "now": relay_now},
         )
 
         self.assertEqual(relay_result["execution_id"], 0)
         self.assertEqual(relay_result["output_count"], 2)
         self.assertEqual(
-            self.token.balance_of(address="relayer", signer="sys"),
+            self.token.balance_of(address=relayer, signer="sys"),
             4,
         )
         self.assertTrue(
@@ -1325,6 +1326,7 @@ class TestShieldedNoteToken(unittest.TestCase):
     @pytest.mark.slow
     def test_relay_transfer_rejects_wrong_relayer_and_expiry(self):
         chain_id = "xian-local-1"
+        relayer = "ab" * 32
         relay_expiry = Datetime(2026, 1, 1, 12, 20, 0)
         asset_id = self.token.asset_id(signer="sys")
 
@@ -1350,7 +1352,7 @@ class TestShieldedNoteToken(unittest.TestCase):
         plan = alice_wallet.build_relay_transfer(
             recipient=bob_wallet.recipient,
             amount=20,
-            relayer="relayer",
+            relayer=relayer,
             chain_id=chain_id,
             fee=3,
             expires_at=relay_expiry,
@@ -1388,7 +1390,7 @@ class TestShieldedNoteToken(unittest.TestCase):
                 relayer_fee=3,
                 expires_at=relay_expiry,
                 output_payloads=plan.output_payloads,
-                signer="relayer",
+                signer=relayer,
                 environment={
                     "chain_id": chain_id,
                     "now": Datetime(2026, 1, 1, 12, 21, 0),
@@ -1401,6 +1403,6 @@ class TestShieldedNoteToken(unittest.TestCase):
             )
         )
         self.assertEqual(
-            self.token.balance_of(address="relayer", signer="sys"),
+            self.token.balance_of(address=relayer, signer="sys"),
             0,
         )
