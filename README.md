@@ -7,8 +7,8 @@ validation surface.
 
 This repo curates contract *packages*. Platform-level execution semantics
 (metering, storage encoding, runtime helpers) live in
-[`xian-contracting`](../xian-contracting). Network-level packaging (manifests,
-modules, solutions) lives in [`xian-configs`](../xian-configs). DEX
+[`xian-contracting`](../xian-contracting). Network-level packaging, reusable
+contract packs, and examples live in [`xian-configs`](../xian-configs). DEX
 contracts moved to [`xian-dex`](../xian-dex); only DEX-adjacent adapters and
 examples remain here.
 
@@ -21,7 +21,7 @@ flowchart LR
   Package --> Readme["Package README"]
   Package --> Status["Maturity status"]
   Runtime["xian-contracting"] --> Package
-  NetworkPackaging["xian-configs modules and solutions"] -. consumes canonical assets .-> Package
+  NetworkPackaging["xian-configs contract packs and examples"] -. consumes canonical assets .-> Package
   DEX["xian-dex"] -. owns canonical DEX .-> NetworkPackaging
 ```
 
@@ -48,7 +48,7 @@ The default `pytest` path excludes the slow proof-generation tests. Run
   `xian-contracting`. This repo curates contract packages on top of that
   surface.
 - **Network packaging is elsewhere.** When a contract becomes part of a
-  canonical network, module, or solution, the manifest belongs in
+  canonical network, contract pack, or example, the manifest belongs in
   `xian-configs`.
 
 ## Package Status
