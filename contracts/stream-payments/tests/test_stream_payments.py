@@ -245,9 +245,7 @@ class TestStreamPayments(unittest.TestCase):
             self.streams.stream_info(stream_id=stream_id)["sender"],
             self.alice,
         )
-        self.assertEqual(
-            self.token.balance_of(address="con_stream_payments"), 20
-        )
+        self.assertEqual(self.token.balance_of(address="con_stream_payments"), 20)
 
     def test_duplicate_schedule_parameters_get_unique_stream_ids(self):
         begins = ts(2026, 1, 1, 0, 0, 0)

@@ -217,13 +217,9 @@ class TestShieldedDexAdapter(unittest.TestCase):
         self.output_token = self.client.get_contract_proxy("con_output_token")
         self.controller = self.client.get_contract_proxy("con_mock_controller")
         self.dex = self.client.get_contract_proxy("con_mock_dex")
-        self.adapter = self.client.get_contract_proxy(
-            "con_shielded_dex_adapter"
-        )
+        self.adapter = self.client.get_contract_proxy("con_shielded_dex_adapter")
 
-        self.input_token.mint(
-            amount=100, to="con_mock_controller", signer="sys"
-        )
+        self.input_token.mint(amount=100, to="con_mock_controller", signer="sys")
         self.alice = "alice"
         self.bob = "bob"
         self.now = Datetime(2026, 1, 1, 12, 0, 0)
@@ -257,15 +253,9 @@ class TestShieldedDexAdapter(unittest.TestCase):
             ),
             85,
         )
-        self.assertEqual(
-            self.output_token.balance_of(address=self.alice, signer="sys"), 30
-        )
-        self.assertEqual(
-            self.controller.get_active_public_spend_remaining(signer="sys"), 0
-        )
-        self.assertEqual(
-            self.dex.get_last_call(signer="sys")["route_type"], "pair"
-        )
+        self.assertEqual(self.output_token.balance_of(address=self.alice, signer="sys"), 30)
+        self.assertEqual(self.controller.get_active_public_spend_remaining(signer="sys"), 0)
+        self.assertEqual(self.dex.get_last_call(signer="sys")["route_type"], "pair")
         self.assertFalse(self.dex.get_last_call(signer="sys")["supporting_fee"])
 
     def test_path_swap_requires_controller_and_can_use_supporting_route(self):
@@ -302,12 +292,8 @@ class TestShieldedDexAdapter(unittest.TestCase):
         self.assertEqual(result["output_amount"], 30)
         self.assertEqual(result["route_type"], "path")
         self.assertTrue(result["supporting_fee_on_transfer"])
-        self.assertEqual(
-            self.output_token.balance_of(address=self.bob, signer="sys"), 30
-        )
-        self.assertEqual(
-            self.dex.get_last_call(signer="sys")["route_type"], "path"
-        )
+        self.assertEqual(self.output_token.balance_of(address=self.bob, signer="sys"), 30)
+        self.assertEqual(self.dex.get_last_call(signer="sys")["route_type"], "path")
         self.assertTrue(self.dex.get_last_call(signer="sys")["supporting_fee"])
 
 

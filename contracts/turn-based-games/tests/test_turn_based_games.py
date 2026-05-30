@@ -60,9 +60,7 @@ class TestTurnBasedGames(unittest.TestCase):
         )
 
         match = self.games.get_match(match_id=match_id, signer=self.alice)
-        move = self.games.get_move(
-            match_id=match_id, move_index=1, signer=self.alice
-        )
+        move = self.games.get_move(match_id=match_id, move_index=1, signer=self.alice)
 
         self.assertEqual(match["state_ref"], "fen-1")
         self.assertEqual(match["move_count"], 2)
@@ -82,9 +80,7 @@ class TestTurnBasedGames(unittest.TestCase):
             signer=self.bob,
             environment={"now": self.now},
         )
-        declined = self.games.get_match(
-            match_id=declined_match, signer=self.alice
-        )
+        declined = self.games.get_match(match_id=declined_match, signer=self.alice)
         self.assertEqual(declined["status"], "cancelled")
         self.assertEqual(declined["cancellation_reason"], "busy")
 
@@ -105,9 +101,7 @@ class TestTurnBasedGames(unittest.TestCase):
             signer=self.bob,
             environment={"now": self.now},
         )
-        resigned = self.games.get_match(
-            match_id=resigned_match, signer=self.alice
-        )
+        resigned = self.games.get_match(match_id=resigned_match, signer=self.alice)
         self.assertEqual(resigned["status"], "completed")
         self.assertEqual(resigned["winner"], self.alice)
         self.assertIn("resigned:", resigned["completion_reason"])

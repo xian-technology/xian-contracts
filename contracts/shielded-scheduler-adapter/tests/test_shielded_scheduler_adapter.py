@@ -58,9 +58,7 @@ class TestShieldedSchedulerAdapter(unittest.TestCase):
         self.client.submit(TARGET_CODE, name="con_adapter_target")
 
         self.scheduler = self.client.get_contract_proxy("con_scheduled_actions")
-        self.adapter = self.client.get_contract_proxy(
-            "con_shielded_scheduler_adapter"
-        )
+        self.adapter = self.client.get_contract_proxy("con_shielded_scheduler_adapter")
         self.target = self.client.get_contract_proxy("con_adapter_target")
         self.scheduler.set_target_allowed(
             target_contract="con_adapter_target",

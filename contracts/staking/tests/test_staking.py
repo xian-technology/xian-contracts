@@ -11,9 +11,7 @@ class TestStakingContract(unittest.TestCase):
         self.client.flush()
 
         # Load and submit the staking contract
-        contract_path = (
-            Path(__file__).resolve().parents[1] / "src" / "con_staking.py"
-        )
+        contract_path = Path(__file__).resolve().parents[1] / "src" / "con_staking.py"
         with contract_path.open() as f:
             contract_code = f.read()
         self.client.submit(contract_code, name="con_staking_test")
@@ -69,47 +67,23 @@ def approve(amount: float, to: str):
         self.owner = "sys"  # Contract owner
 
         # Fund accounts
-        self.stake_token.transfer(
-            amount=10000, to=self.creator, signer=self.owner
-        )
-        self.stake_token.transfer(
-            amount=10000, to=self.staker1, signer=self.owner
-        )
-        self.stake_token.transfer(
-            amount=10000, to=self.staker2, signer=self.owner
-        )
+        self.stake_token.transfer(amount=10000, to=self.creator, signer=self.owner)
+        self.stake_token.transfer(amount=10000, to=self.staker1, signer=self.owner)
+        self.stake_token.transfer(amount=10000, to=self.staker2, signer=self.owner)
 
-        self.reward_token.transfer(
-            amount=10000, to=self.creator, signer=self.owner
-        )
-        self.fee_token.transfer(
-            amount=10000, to=self.staker1, signer=self.owner
-        )
-        self.fee_token.transfer(
-            amount=10000, to=self.staker2, signer=self.owner
-        )
+        self.reward_token.transfer(amount=10000, to=self.creator, signer=self.owner)
+        self.fee_token.transfer(amount=10000, to=self.staker1, signer=self.owner)
+        self.fee_token.transfer(amount=10000, to=self.staker2, signer=self.owner)
 
         # Set up approvals
-        self.stake_token.approve(
-            amount=10000, to="con_staking_test", signer=self.staker1
-        )
-        self.stake_token.approve(
-            amount=10000, to="con_staking_test", signer=self.staker2
-        )
-        self.reward_token.approve(
-            amount=10000, to="con_staking_test", signer=self.creator
-        )
-        self.fee_token.approve(
-            amount=10000, to="con_staking_test", signer=self.staker1
-        )
-        self.fee_token.approve(
-            amount=10000, to="con_staking_test", signer=self.staker2
-        )
+        self.stake_token.approve(amount=10000, to="con_staking_test", signer=self.staker1)
+        self.stake_token.approve(amount=10000, to="con_staking_test", signer=self.staker2)
+        self.reward_token.approve(amount=10000, to="con_staking_test", signer=self.creator)
+        self.fee_token.approve(amount=10000, to="con_staking_test", signer=self.staker1)
+        self.fee_token.approve(amount=10000, to="con_staking_test", signer=self.staker2)
 
         self.environment = {"chain_id": "test-chain"}
-        self.test_time = Datetime(
-            year=2024, month=1, day=1, hour=12, minute=0, second=0
-        )
+        self.test_time = Datetime(year=2024, month=1, day=1, hour=12, minute=0, second=0)
 
     def tearDown(self):
         self.client.flush()
@@ -158,9 +132,7 @@ def approve(amount: float, to: str):
             lock_duration=172800,  # 2 days
             max_positions=50,
             stake_amount=200.0,
-            start_date=Datetime(
-                year=2024, month=1, day=2, hour=12, minute=0, second=0
-            ),
+            start_date=Datetime(year=2024, month=1, day=2, hour=12, minute=0, second=0),
             early_withdrawal_enabled=False,
             penalty_rate=0.2,
             entry_fee_amount=10.0,
@@ -253,9 +225,7 @@ def approve(amount: float, to: str):
 
     def test_create_pool_past_start_date(self):
         """Test pool creation with past start date fails"""
-        past_time = Datetime(
-            year=2023, month=12, day=31, hour=12, minute=0, second=0
-        )
+        past_time = Datetime(year=2023, month=12, day=31, hour=12, minute=0, second=0)
 
         with self.assertRaises(AssertionError) as context:
             self.staking.create_pool(
@@ -269,9 +239,7 @@ def approve(amount: float, to: str):
                 signer=self.creator,
                 environment={"now": self.test_time},
             )
-        self.assertIn(
-            "Start date cannot be in the past", str(context.exception)
-        )
+        self.assertIn("Start date cannot be in the past", str(context.exception))
 
     def test_create_pool_entry_fee_without_token(self):
         """Test pool creation with entry fee but no token fails"""
@@ -288,9 +256,7 @@ def approve(amount: float, to: str):
                 signer=self.creator,
                 environment={"now": self.test_time},
             )
-        self.assertIn(
-            "Entry fee token must be specified", str(context.exception)
-        )
+        self.assertIn("Entry fee token must be specified", str(context.exception))
 
     def test_create_pool_when_paused(self):
         """Test pool creation when contract is paused fails"""
@@ -345,24 +311,18 @@ def approve(amount: float, to: str):
 
         # Verify token transfer
         self.assertEqual(
-            self.stake_token.balance_of(
-                address=self.staker1, signer=self.staker1
-            ),
+            self.stake_token.balance_of(address=self.staker1, signer=self.staker1),
             9900.0,
         )
         self.assertEqual(
-            self.stake_token.balance_of(
-                address="con_staking_test", signer=self.staker1
-            ),
+            self.stake_token.balance_of(address="con_staking_test", signer=self.staker1),
             100.0,
         )
 
         # Verify event emission - check data_indexed for indexed fields
         self.assertEqual(result["events"][0]["event"], "Stake")
         self.assertEqual(result["events"][0]["data_indexed"]["pool_id"], "0")
-        self.assertEqual(
-            result["events"][0]["data_indexed"]["staker"], self.staker1
-        )
+        self.assertEqual(result["events"][0]["data_indexed"]["staker"], self.staker1)
 
     def test_stake_with_entry_fee(self):
         """Test staking with entry fee"""
@@ -396,15 +356,11 @@ def approve(amount: float, to: str):
 
         # Verify fee token transfer
         self.assertEqual(
-            self.fee_token.balance_of(
-                address=self.staker1, signer=self.staker1
-            ),
+            self.fee_token.balance_of(address=self.staker1, signer=self.staker1),
             9990.0,
         )
         self.assertEqual(
-            self.fee_token.balance_of(
-                address="con_staking_test", signer=self.staker1
-            ),
+            self.fee_token.balance_of(address="con_staking_test", signer=self.staker1),
             10.0,
         )
 
@@ -424,9 +380,7 @@ def approve(amount: float, to: str):
 
     def test_stake_before_start_date(self):
         """Test staking before pool start date fails"""
-        future_time = Datetime(
-            year=2024, month=1, day=2, hour=12, minute=0, second=0
-        )
+        future_time = Datetime(year=2024, month=1, day=2, hour=12, minute=0, second=0)
 
         # Create pool with future start date
         self.staking.create_pool(
@@ -565,9 +519,7 @@ def approve(amount: float, to: str):
         )
 
         # Wait for lock period to end
-        later_time = Datetime(
-            year=2024, month=1, day=2, hour=12, minute=0, second=1
-        )
+        later_time = Datetime(year=2024, month=1, day=2, hour=12, minute=0, second=1)
 
         # Unstake
         result = self.staking.unstake(
@@ -579,17 +531,13 @@ def approve(amount: float, to: str):
 
         # Verify full stake returned (no penalty)
         self.assertEqual(
-            self.stake_token.balance_of(
-                address=self.staker1, signer=self.staker1
-            ),
+            self.stake_token.balance_of(address=self.staker1, signer=self.staker1),
             10000.0,
         )
 
         # Verify rewards received
         self.assertEqual(
-            self.reward_token.balance_of(
-                address=self.staker1, signer=self.staker1
-            ),
+            self.reward_token.balance_of(address=self.staker1, signer=self.staker1),
             10.0,
         )  # 10% APY
 
@@ -631,9 +579,7 @@ def approve(amount: float, to: str):
         )
 
         # Unstake early (after 12 hours = 50% of lock period)
-        early_time = Datetime(
-            year=2024, month=1, day=2, hour=0, minute=0, second=0
-        )
+        early_time = Datetime(year=2024, month=1, day=2, hour=0, minute=0, second=0)
 
         # Perform unstake operation
         result = self.staking.unstake(
@@ -653,9 +599,7 @@ def approve(amount: float, to: str):
         # Verify partial rewards (50% of time = 50% of rewards)
         expected_rewards = 10.0 * 0.5  # 5.0
         self.assertEqual(
-            self.reward_token.balance_of(
-                address=self.staker1, signer=self.staker1
-            ),
+            self.reward_token.balance_of(address=self.staker1, signer=self.staker1),
             expected_rewards,
             "Reward amount mismatch",
         )
@@ -664,17 +608,13 @@ def approve(amount: float, to: str):
         expected_penalty = 100.0 * 0.1 * 0.5  # 5.0
         expected_return = 100.0 - expected_penalty  # 95.0
         self.assertEqual(
-            self.stake_token.balance_of(
-                address=self.staker1, signer=self.staker1
-            ),
+            self.stake_token.balance_of(address=self.staker1, signer=self.staker1),
             9900.0 + expected_return,
             "Stake return amount mismatch",
         )
 
         # Verify event data
-        self.assertEqual(
-            result["events"][0]["data"]["early"], True, "Early flag mismatch"
-        )
+        self.assertEqual(result["events"][0]["data"]["early"], True, "Early flag mismatch")
         self.assertEqual(
             result["events"][0]["data"]["penalty"],
             expected_penalty,
@@ -713,9 +653,7 @@ def approve(amount: float, to: str):
         )
 
         # Attempt early unstake
-        early_time = Datetime(
-            year=2024, month=1, day=2, hour=0, minute=0, second=0
-        )
+        early_time = Datetime(year=2024, month=1, day=2, hour=0, minute=0, second=0)
 
         with self.assertRaises(AssertionError) as context:
             self.staking.unstake(
@@ -819,15 +757,11 @@ def approve(amount: float, to: str):
 
         # Verify token transfer
         self.assertEqual(
-            self.reward_token.balance_of(
-                address=self.creator, signer=self.creator
-            ),
+            self.reward_token.balance_of(address=self.creator, signer=self.creator),
             9000.0,
         )
         self.assertEqual(
-            self.reward_token.balance_of(
-                address="con_staking_test", signer=self.creator
-            ),
+            self.reward_token.balance_of(address="con_staking_test", signer=self.creator),
             1000.0,
         )
 
@@ -863,9 +797,7 @@ def approve(amount: float, to: str):
                 signer=self.staker1,
                 environment={"now": self.test_time},
             )
-        self.assertIn(
-            "Only pool creator can deposit rewards", str(context.exception)
-        )
+        self.assertIn("Only pool creator can deposit rewards", str(context.exception))
 
     def test_deposit_rewards_zero_amount(self):
         """Test depositing zero rewards fails"""
@@ -925,17 +857,11 @@ def approve(amount: float, to: str):
         )
 
         # Unstake early to generate penalty
-        early_time = Datetime(
-            year=2024, month=1, day=1, hour=18, minute=0, second=0
-        )
-        self.staking.unstake(
-            pool_id="0", signer=self.staker1, environment={"now": early_time}
-        )
+        early_time = Datetime(year=2024, month=1, day=1, hour=18, minute=0, second=0)
+        self.staking.unstake(pool_id="0", signer=self.staker1, environment={"now": early_time})
 
         # Withdraw fees
-        initial_fee_balance = self.fee_token.balance_of(
-            address=self.creator, signer=self.creator
-        )
+        initial_fee_balance = self.fee_token.balance_of(address=self.creator, signer=self.creator)
         initial_stake_balance = self.stake_token.balance_of(
             address=self.creator, signer=self.creator
         )
@@ -947,23 +873,17 @@ def approve(amount: float, to: str):
         )
 
         # Verify fee withdrawal
-        final_fee_balance = self.fee_token.balance_of(
-            address=self.creator, signer=self.creator
-        )
+        final_fee_balance = self.fee_token.balance_of(address=self.creator, signer=self.creator)
         self.assertEqual(final_fee_balance, initial_fee_balance + 10.0)
 
         # Verify penalty withdrawal (should be > 0)
-        final_stake_balance = self.stake_token.balance_of(
-            address=self.creator, signer=self.creator
-        )
+        final_stake_balance = self.stake_token.balance_of(address=self.creator, signer=self.creator)
         self.assertGreater(final_stake_balance, initial_stake_balance)
 
         # Verify fees reset
         pool_info = self.staking.get_pool_info(pool_id="0", signer=self.creator)
         self.assertEqual(pool_info["config"]["creator_fees_collected"], 0.0)
-        self.assertEqual(
-            pool_info["config"]["creator_penalties_collected"], 0.0
-        )
+        self.assertEqual(pool_info["config"]["creator_penalties_collected"], 0.0)
 
     def test_withdraw_creator_fees_not_creator(self):
         """Test withdrawing fees by non-creator fails"""
@@ -985,9 +905,7 @@ def approve(amount: float, to: str):
                 signer=self.staker1,
                 environment={"now": self.test_time},
             )
-        self.assertIn(
-            "Only pool creator can withdraw fees", str(context.exception)
-        )
+        self.assertIn("Only pool creator can withdraw fees", str(context.exception))
 
     # Calculate Rewards Tests
     def test_calculate_rewards_full_period(self):
@@ -1012,9 +930,7 @@ def approve(amount: float, to: str):
         )
 
         # Calculate rewards after full period
-        later_time = Datetime(
-            year=2024, month=1, day=2, hour=12, minute=0, second=1
-        )
+        later_time = Datetime(year=2024, month=1, day=2, hour=12, minute=0, second=1)
         rewards = self.staking.calculate_rewards(
             pool_id="0",
             staker=self.staker1,
@@ -1050,9 +966,7 @@ def approve(amount: float, to: str):
         )
 
         # Calculate rewards after 50% of period
-        partial_time = Datetime(
-            year=2024, month=1, day=2, hour=0, minute=0, second=0
-        )
+        partial_time = Datetime(year=2024, month=1, day=2, hour=0, minute=0, second=0)
         rewards = self.staking.calculate_rewards(
             pool_id="0",
             staker=self.staker1,
@@ -1062,9 +976,7 @@ def approve(amount: float, to: str):
 
         self.assertEqual(rewards["current_reward"], 5.0)  # 50% of 10%
         self.assertEqual(rewards["max_reward"], 10.0)
-        self.assertEqual(
-            rewards["potential_penalty"], 5.0
-        )  # 50% time remaining * 10% penalty
+        self.assertEqual(rewards["potential_penalty"], 5.0)  # 50% time remaining * 10% penalty
         self.assertEqual(rewards["is_early"], True)
 
     # Emergency Functions Tests
@@ -1089,24 +1001,18 @@ def approve(amount: float, to: str):
     def test_emergency_withdraw_token(self):
         """Test emergency token withdrawal"""
         # Transfer some tokens to contract first
-        self.stake_token.transfer(
-            amount=1000.0, to="con_staking_test", signer=self.owner
-        )
+        self.stake_token.transfer(amount=1000.0, to="con_staking_test", signer=self.owner)
 
         # Pause contract
         self.staking.emergency_pause(signer=self.owner)
 
         # Emergency withdraw
-        initial_balance = self.stake_token.balance_of(
-            address=self.owner, signer=self.owner
-        )
+        initial_balance = self.stake_token.balance_of(address=self.owner, signer=self.owner)
         self.staking.emergency_withdraw_token(
             token_contract="con_stake_token", amount=500.0, signer=self.owner
         )
 
-        final_balance = self.stake_token.balance_of(
-            address=self.owner, signer=self.owner
-        )
+        final_balance = self.stake_token.balance_of(address=self.owner, signer=self.owner)
         self.assertEqual(final_balance, initial_balance + 500.0)
 
     def test_emergency_withdraw_not_owner(self):
@@ -1119,9 +1025,7 @@ def approve(amount: float, to: str):
                 amount=500.0,
                 signer=self.creator,
             )
-        self.assertIn(
-            "Only contract owner can emergency withdraw", str(context.exception)
-        )
+        self.assertIn("Only contract owner can emergency withdraw", str(context.exception))
 
     def test_emergency_withdraw_not_paused(self):
         """Test emergency withdrawal when not paused fails"""
@@ -1140,9 +1044,7 @@ def approve(amount: float, to: str):
     def test_get_stake_info_nonexistent(self):
         """Test getting info for nonexistent stake fails"""
         with self.assertRaises(AssertionError) as context:
-            self.staking.get_stake_info(
-                pool_id="0", staker=self.staker1, signer=self.creator
-            )
+            self.staking.get_stake_info(pool_id="0", staker=self.staker1, signer=self.creator)
         self.assertIn("Stake not found", str(context.exception))
 
     def test_calculate_rewards_nonexistent_pool(self):
@@ -1223,12 +1125,8 @@ def approve(amount: float, to: str):
         )
 
         # Verify independent tracking
-        pool0_info = self.staking.get_pool_info(
-            pool_id="0", signer=self.creator
-        )
-        pool1_info = self.staking.get_pool_info(
-            pool_id="1", signer=self.creator
-        )
+        pool0_info = self.staking.get_pool_info(pool_id="0", signer=self.creator)
+        pool1_info = self.staking.get_pool_info(pool_id="1", signer=self.creator)
 
         self.assertEqual(pool0_info["stats"]["current_positions"], 2)
         self.assertEqual(pool1_info["stats"]["current_positions"], 1)
@@ -1263,9 +1161,7 @@ def approve(amount: float, to: str):
             environment={"now": self.test_time},
         )
 
-        later_time = Datetime(
-            year=2024, month=1, day=2, hour=12, minute=0, second=1
-        )
+        later_time = Datetime(year=2024, month=1, day=2, hour=12, minute=0, second=1)
         result = self.staking.unstake(
             pool_id="0",
             signer=self.staker1,

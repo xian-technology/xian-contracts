@@ -110,19 +110,13 @@ class TestXSC005(unittest.TestCase):
         )
 
     def test_reference_contract_passes_xsc005_checker(self):
-        self.assertTrue(
-            self.standard.is_XSC005(contract="con_xsc005_nft", signer="sys")
-        )
-        self.assertFalse(
-            self.standard.is_XSC005(contract="con_invalid_nft", signer="sys")
-        )
+        self.assertTrue(self.standard.is_XSC005(contract="con_xsc005_nft", signer="sys"))
+        self.assertFalse(self.standard.is_XSC005(contract="con_invalid_nft", signer="sys"))
 
     def test_mint_stores_on_chain_content_and_metadata(self):
         self.mint_inline()
 
-        metadata = self.nft.token_metadata(
-            token_id="pixel-1", signer=self.alice
-        )
+        metadata = self.nft.token_metadata(token_id="pixel-1", signer=self.alice)
 
         self.assertEqual(self.nft.owner_of(token_id="pixel-1"), self.alice)
         self.assertEqual(self.nft.balance_of(owner=self.alice), 1)
@@ -164,9 +158,7 @@ class TestXSC005(unittest.TestCase):
 
         self.assertEqual(palette["size"], 4)
         self.assertEqual(palette["locked"], True)
-        self.assertEqual(
-            self.nft.palette_color(palette_id="neon", index=1), "#ff00aa"
-        )
+        self.assertEqual(self.nft.palette_color(palette_id="neon", index=1), "#ff00aa")
         self.assertEqual(metadata["mime_type"], "application/x.xian.pixelgrid")
         self.assertEqual(metadata["render_schema"], "xian.pixelgrid.v1")
         self.assertEqual(metadata["palette_id"], "neon")
@@ -304,9 +296,7 @@ class TestXSC005(unittest.TestCase):
         )
 
         with self.assertRaises(AssertionError):
-            self.nft.transfer(
-                token_id="chunked", to=self.bob, signer=self.alice
-            )
+            self.nft.transfer(token_id="chunked", to=self.bob, signer=self.alice)
 
         self.nft.set_content_chunk(
             token_id="chunked",
@@ -346,9 +336,7 @@ class TestXSC005(unittest.TestCase):
         self.assertEqual(self.currency.balance_of(address=self.alice), 95)
         self.assertEqual(self.currency.balance_of(address=self.creator), 999005)
         self.assertEqual(self.currency.balance_of(address=self.bob), 900)
-        self.assertEqual(
-            self.nft.listing_info(token_id="pixel-1")["seller"], ""
-        )
+        self.assertEqual(self.nft.listing_info(token_id="pixel-1")["seller"], "")
 
     def test_like_and_ownership_proof_are_authenticated(self):
         self.mint_inline()
