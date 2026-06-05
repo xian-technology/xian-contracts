@@ -5,6 +5,12 @@ Status: `candidate`
 This package defines the XSC-0005 non-fungible token standard for Xian and
 ships a reference implementation for single-contract NFT collections.
 
+## Product Ownership
+
+This package is standards/reference material, not the NFT marketplace product.
+The deployable NFT product surface lives in `xian-nft`, which owns the
+PixelSnek app, product bootstrap tooling, and product-level contract bundle.
+
 ## Files
 
 - `src/con_xsc005.py`: on-chain interface checker for XSC-0005 collections
