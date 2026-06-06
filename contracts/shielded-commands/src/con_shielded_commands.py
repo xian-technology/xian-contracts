@@ -2,7 +2,6 @@ FIELD_MODULUS = (
     21888242871839275222246405745257275088548364400416034343698204186575808495617
 )
 FIELD_ZERO_HEX = "0x" + "00" * 32
-MIMC_ROUNDS = 91
 MAX_INPUT_NULLIFIERS = 4
 MAX_OUTPUT_COMMITMENTS = 4
 SHIELDED_TREE_DEPTH = 20
@@ -13,8 +12,8 @@ MAX_COMMITMENT_PAGE_SIZE = 128
 MAX_OUTPUT_PAYLOAD_BYTES = 4096
 TARGET_ENTRYPOINT = "interact"
 COMMAND_BINDING_VERSION = "shielded-command-v4"
-COMMAND_CIRCUIT_FAMILY = "shielded_command_v4"
-COMMAND_STATEMENT_VERSION = "4"
+COMMAND_CIRCUIT_FAMILY = "shielded_command_v5"
+COMMAND_STATEMENT_VERSION = "5"
 
 
 def require_positive_amount(amount: int):
@@ -81,75 +80,10 @@ def field_int(value: str):
     return int(value[2:], 16)
 
 
-def mimc_round_constant(round_index: int):
-    return field_int_from_text("xian-mimc-bn254-" + str(round_index))
-
-
-def mimc_permute(state: int):
-    assert isinstance(state, int), "MiMC state must be an integer!"
-    state = state % FIELD_MODULUS
-    for round_index in range(MIMC_ROUNDS):
-        state = pow(
-            (state + mimc_round_constant(round_index)) % FIELD_MODULUS,
-            7,
-            FIELD_MODULUS,
-        )
-    return state
-
-
-def mimc_hash_many_int(values: list):
-    state = 0
-    for value in values:
-        assert isinstance(value, int), "MiMC inputs must be integers!"
-        state = mimc_permute((state + value) % FIELD_MODULUS)
-    return state
-
-
-def mimc_hash_pair_hex(left: str, right: str):
-    return field_hex_from_int(
-        mimc_hash_many_int([field_int(left), field_int(right)])
-    )
-
-
-def owner_public_hex(owner_secret: str):
-    require_field_hex32("owner_secret", owner_secret)
-    return field_hex_from_int(mimc_hash_many_int([field_int(owner_secret)]))
-
-
-def note_commitment_hex(
-    asset_id: str,
-    owner_secret: str,
-    amount: int,
-    rho: str,
-    blind: str,
-):
-    require_field_hex32("asset_id", asset_id)
-    require_field_hex32("owner_secret", owner_secret)
-    require_shielded_amount(amount)
-    require_field_hex32("rho", rho)
-    require_field_hex32("blind", blind)
-    return field_hex_from_int(
-        mimc_hash_many_int(
-            [
-                field_int(asset_id),
-                field_int(owner_public_hex(owner_secret)),
-                amount,
-                field_int(rho),
-                field_int(blind),
-            ]
-        )
-    )
-
-
-def nullifier_hex(asset_id: str, owner_secret: str, rho: str):
-    require_field_hex32("asset_id", asset_id)
-    require_field_hex32("owner_secret", owner_secret)
-    require_field_hex32("rho", rho)
-    return field_hex_from_int(
-        mimc_hash_many_int(
-            [field_int(asset_id), field_int(owner_secret), field_int(rho)]
-        )
-    )
+# Note commitments, nullifiers, owner-public values, and Merkle parents are all
+# computed by the native zk verifier (the single source of truth for the hash)
+# and reach this contract through the `zk.shielded_*` bridge helpers. The contract
+# never recomputes the algebraic hash itself.
 
 
 def normalize_payload(payload: dict):
@@ -203,30 +137,9 @@ def canonicalize_payload(value):
     assert False, "Unsupported payload value type!"
 
 
-ZERO_HASHES = [
-    "0x0000000000000000000000000000000000000000000000000000000000000000",
-    "0x128c796e219270214c63a22e8bb92a0bf53808943902c17a841d21f9740fab7e",
-    "0x26767e9b36f2cd35c393b8b0519ec28348544459fa906ab129cb8e83b15f7f74",
-    "0x24cecc0d07c730bb00c13fb84db003b50a2d8b406855874f884372fdd7676511",
-    "0x1478b76fe5277047a47f124f54ee210b2c7cc64677d849e55a58c475dd106ecb",
-    "0x0e044fd4decceeb33b8daf74ea6e613e14f041fac78517a9f59916b7e8600096",
-    "0x05efc2a3b6898f82b095489eabd3e51c44804ed2507094d57f7e3e815f00cb81",
-    "0x18ee5610c6bcfdec93df17c1ecdc2881b8840f679347e36fcebd0507ef087c61",
-    "0x0b7c6b5146d522adf81f6e6006d839f3b32e9ea88bbabd1c2773518235d4296e",
-    "0x2ea192f765d1323e3db8bd9ec89675199e0197be1f562bf655984713a7b5e77d",
-    "0x25e8a8104d3d0e91129e8e234aa525640b86d58c49d05f8be6d29f6ca878c3f1",
-    "0x15bb32df7f1e255405683ad1085be16b142c24b49ee192215c436d3171adc13e",
-    "0x139bc30f7e04b8a8e35bda338d9a837543ec3bfa766aa7e42d64cc906c6aa1ee",
-    "0x2790f551bbdcf40f2be132ae001e8cafa8015c2586fa1716755bdbb1717e75e8",
-    "0x02f8689a08899caa53982adfc90843fd5b57f2b3cc3f41b3233061b27f586d43",
-    "0x0760291d6484353901552a4178132087e2613ed9b044d91197b49f676438f81c",
-    "0x2282a1b55ef1179f6c3b4abd069f565196e53a18dc30070ab813bce814185818",
-    "0x253752b8470dd5eacf1e4d36c406ad70b1ac5a0bbf216a4d0a2c3a45b986e536",
-    "0x1a0c3e54da65708e4a169a0bc0a11e75fae24cb05d05ebb2f4506dca039a5500",
-    "0x2de0e7eee52e064031f096a1cabe60a98486a369109dbb2947d9ab32179b9ede",
-    "0x2fdfc505f5f2654af1528f65398e82c2c38814001634e8ea2965f51b038551f1",
-]
-ZERO_ROOT = ZERO_HASHES[SHIELDED_TREE_DEPTH]
+# Poseidon-BN254 empty-tree root for a depth-20 frontier. Equal to
+# zk.shielded_note_zero_root(); asserted by the cross-layer parity test.
+ZERO_ROOT = "0x07e386c6e879e13430a36d358575a23613dc51042100357418cab642fd0f6eb5"
 
 
 def contract_asset_id():
@@ -493,34 +406,6 @@ def current_filled_subtrees():
             subtree = FIELD_ZERO_HEX
         values.append(subtree)
     return values
-
-
-def append_single_commitment(commitment: str):
-    require_field_hex32("output commitment", commitment)
-    assert commitment != FIELD_ZERO_HEX, "Output commitment must be non-zero!"
-    assert note_exists[commitment] is not True, "Commitment already exists!"
-
-    index = note_count.get()
-    assert index < MAX_NOTE_LEAVES, "Shielded note tree is full!"
-
-    current_hash = commitment
-    current_index = index
-
-    for level in range(SHIELDED_TREE_DEPTH):
-        if current_index % 2 == 0:
-            filled_subtrees[level] = current_hash
-            current_hash = mimc_hash_pair_hex(current_hash, ZERO_HASHES[level])
-        else:
-            left_hash = filled_subtrees[level]
-            if left_hash is None:
-                left_hash = FIELD_ZERO_HEX
-            current_hash = mimc_hash_pair_hex(left_hash, current_hash)
-        current_index = current_index // 2
-
-    note_exists[commitment] = True
-    note_commitments[index] = commitment
-    note_count.set(index + 1)
-    return current_hash
 
 
 def accept_root(new_root: str):
