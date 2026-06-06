@@ -251,7 +251,7 @@ class TestShieldedNoteToken(unittest.TestCase):
                 circuit_name=vk["circuit_name"],
                 version=vk["version"],
                 artifact_contract_name=self.fixture["contract_name"],
-                circuit_family="shielded_note_v3",
+                circuit_family="shielded_note_v4",
                 statement_version=vk["version"],
                 tree_depth=self.fixture["tree_depth"],
                 leaf_capacity=self.fixture["leaf_capacity"],
@@ -429,8 +429,8 @@ class TestShieldedNoteToken(unittest.TestCase):
         self.assertEqual(
             config,
             {
-                "circuit_family": "shielded_note_v3",
-                "statement_version": "3",
+                "circuit_family": "shielded_note_v4",
+                "statement_version": "4",
                 "tree_depth": self.fixture["tree_depth"],
                 "leaf_capacity": self.fixture["leaf_capacity"],
                 "max_inputs": self.fixture["max_inputs"],
@@ -1094,7 +1094,7 @@ class TestShieldedNoteToken(unittest.TestCase):
 
         self.assertEqual(
             self.token.get_relay_proof_config(signer="sys")["circuit_family"],
-            "shielded_command_v4",
+            "shielded_command_v5",
         )
         self.token.mint_public(amount=100, to=self.alice, signer="sys")
         alice_wallet = ShieldedRelayTransferWallet.from_parts(
