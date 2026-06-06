@@ -170,7 +170,13 @@ def interact(payload: dict):
     )
     amount_out_min = require_amount(payload.get("amount_out_min"), "amount_out_min")
     deadline = payload.get("deadline")
-    assert deadline is not None, "deadline is required."
+    if deadline is None:
+        deadline_seconds = payload.get("deadline_seconds")
+        if deadline_seconds is None:
+            deadline_seconds = 600
+        assert isinstance(deadline_seconds, int), "deadline_seconds must be an integer."
+        assert 0 < deadline_seconds <= 3600, "deadline_seconds is out of range."
+        deadline = now + datetime.timedelta(seconds=deadline_seconds)
     recipient = normalize_text(payload.get("recipient"), "recipient", 128)
     supporting_fee = payload.get("supporting_fee_on_transfer") is True
 
