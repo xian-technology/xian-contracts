@@ -7,10 +7,11 @@ validation surface.
 
 This repo curates contract *packages*. Platform-level execution semantics
 (metering, storage encoding, runtime helpers) live in
-[`xian-contracting`](../xian-contracting). Network-level packaging, reusable
-contract packs, and examples live in [`xian-configs`](../xian-configs). DEX
-contracts moved to [`xian-dex`](../xian-dex); only DEX-adjacent adapters and
-examples remain here.
+[`xian-contracting`](../xian-contracting). Network-level packaging, optional
+system contract bundles, and templates live in
+[`xian-configs`](../xian-configs). Product and example contract sources live in
+their owning repos. DEX contracts moved to
+[`xian-dex`](../xian-dex); only DEX-adjacent adapters and examples remain here.
 
 ## Curation Shape
 
@@ -21,8 +22,9 @@ flowchart LR
   Package --> Readme["Package README"]
   Package --> Status["Maturity status"]
   Runtime["xian-contracting"] --> Package
-  NetworkPackaging["xian-configs contract packs and examples"] -. consumes canonical assets .-> Package
-  DEX["xian-dex"] -. owns canonical DEX .-> NetworkPackaging
+  NetworkPackaging["xian-configs system bundles"] -. consumes canonical assets .-> Package
+  ProductRepos["product and SDK example repos"] -. reuse packages .-> Package
+  DEX["xian-dex"] -. owns canonical DEX .-> ProductRepos
 ```
 
 ## Quick Start
@@ -48,8 +50,8 @@ The default `pytest` path excludes the slow proof-generation tests. Run
   `xian-contracting`. This repo curates contract packages on top of that
   surface.
 - **Network packaging is elsewhere.** When a contract becomes part of a
-  canonical network, contract pack, or example, the manifest belongs in
-  `xian-configs`.
+  canonical network, the manifest or source snapshot belongs in `xian-configs`.
+  Product and example workflows belong in their owning repos.
 
 ## Package Status
 
