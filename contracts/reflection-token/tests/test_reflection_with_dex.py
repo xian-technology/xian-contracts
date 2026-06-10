@@ -12,9 +12,7 @@ from xian_runtime_types.time import Datetime
 ROOT = Path(__file__).resolve().parents[1]
 WORKSPACE_ROOT = Path(os.environ.get("XIAN_WORKSPACE_ROOT", ROOT.parents[2])).expanduser()
 REFLECTION_PATH = ROOT / "src" / "con_reflection_token.py"
-DEFAULT_DEX_BUNDLE_PATH = (
-    WORKSPACE_ROOT / "xian-dex" / "contract-bundle.json"
-)
+DEFAULT_DEX_BUNDLE_PATH = WORKSPACE_ROOT / "xian-dex" / "contract-bundle.json"
 REFLECTION_LP_TOKEN = "con_reflection_currency_lp"
 
 
