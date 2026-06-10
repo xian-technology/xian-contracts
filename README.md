@@ -7,11 +7,12 @@ validation surface.
 
 This repo curates contract *packages*. Platform-level execution semantics
 (metering, storage encoding, runtime helpers) live in
-[`xian-contracting`](../xian-contracting). Network-level packaging, optional
-system contract bundles, and templates live in
+[`xian-contracting`](../xian-contracting). Network-level packaging, system
+contract bundles, and templates live in
 [`xian-configs`](../xian-configs). Product and example contract sources live in
-their owning repos. DEX contracts moved to
-[`xian-dex`](../xian-dex); only DEX-adjacent adapters and examples remain here.
+their owning repos: the canonical DEX contracts live in
+[`xian-dex`](../xian-dex), and only DEX-adjacent adapters and examples are
+curated here.
 
 ## Curation Shape
 
@@ -66,6 +67,7 @@ The default `pytest` path excludes the slow proof-generation tests. Run
 | `contracts/shielded-scheduler-adapter` | candidate  | Capability-style adapter that lets shielded commands drive scheduled-actions without a stable user identity |
 | `contracts/stream-payments`          | candidate    | Standalone escrowed token-stream contract extracted from legacy XSC003-style logic                   |
 | `contracts/shielded-note-token`      | candidate    | Root / nullifier / note-based shielded token with registry-backed zk verification ids                |
+| `contracts/xsc005`                   | candidate    | XSC-0005 NFT standard checker and reference collection (the NFT product surface lives in `xian-nft`) |
 | `contracts/reflection-token`         | candidate    | Reflection token designed to integrate with the Xian DEX                                             |
 | `contracts/lottery`                  | experimental | Simple lottery pattern using deterministic public randomness                                         |
 | `contracts/shielded-commands`        | experimental | Proof-backed shielded command pool for anonymous relayed contract execution                          |
