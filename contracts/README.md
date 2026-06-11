@@ -44,9 +44,10 @@ flowchart LR
 - `xsc001/`: token interface checker
 - `xsc005/`: non-fungible token interface checker and reference collection
 
-## Moved Packages
+## DEX Ownership
 
-- DEX moved to the sibling `xian-dex` repository, which now owns the canonical
-  `con_pairs`, `con_dex`, `con_dex_helper`, LP token contract, tests, and web
-  frontend. Cross-contract fixtures should consume the pinned DEX module bundle
-  from `xian-configs` unless they are explicitly testing unreleased DEX source.
+- The canonical DEX (`con_pairs`, `con_dex`, `con_dex_helper`, the LP token
+  contract, tests, and web frontend) lives in the sibling `xian-dex`
+  repository. Cross-contract fixtures should consume the hash-pinned
+  `contract-bundle.json` from `xian-dex` unless they are explicitly testing
+  unreleased DEX source.
