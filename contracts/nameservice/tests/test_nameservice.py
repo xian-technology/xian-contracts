@@ -71,7 +71,7 @@ class TestNameservice(unittest.TestCase):
     def test_blacklist_applies_after_lowercase_normalization(self):
         with self.assertRaises(AssertionError):
             self.nameservice.mint_name(
-                name="DAO",
+                name="Validators",
                 signer=self.alice,
                 environment={"now": Datetime(2026, 1, 1)},
             )

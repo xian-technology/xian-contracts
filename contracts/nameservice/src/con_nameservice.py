@@ -16,7 +16,7 @@ enabled = Variable()
 main_name_to_address = Hash(default_value=None)
 address_to_main_name = Hash(default_value=None)
 
-BLACKLIST_NAMES = ["dao", "masternodes", "rewards", "submission", "currency", "foundation"]
+BLACKLIST_NAMES = ["dao", "validators", "rewards", "submission", "currency", "foundation"]
 
 @construct
 def seed():
