@@ -1,0 +1,20 @@
+{
+  "schema": "xian.contract_bundle.v1",
+  "schema_version": 1,
+  "name": "profile-registry",
+  "display_name": "Profile Registry",
+  "version": "0.1.0",
+  "description": "Social profile and channel registry scaffold with username resolution.",
+  "source": {
+    "repo": "https://github.com/xian-technology/xian-contracts"
+  },
+  "contracts": [
+    {
+      "name": "con_profile_registry",
+      "role": "registry",
+      "path": "src/con_profile_registry.py",
+      "sha256": "4d350c855014045a661c4def39e0abd8364ff45ffa8ba6a6f7090d8d43062e2f",
+      "deploy_order": 10
+    }
+  ]
+}

@@ -43,7 +43,8 @@ The default `pytest` path excludes the slow proof-generation tests. Run
 ## Principles
 
 - **Discoverability with structure.** Every contract package has its own
-  folder, its own `README.md`, and a clear maturity marker.
+  folder, its own `README.md`, a package-local `contract-bundle.json`, and a
+  clear maturity marker.
 - **Maturity matters.** Curated, candidate, and experimental contracts are
   labeled honestly — experimental contracts are not presented as
   production-ready.
@@ -77,7 +78,8 @@ The default `pytest` path excludes the slow proof-generation tests. Run
 ## Key Directories
 
 - `contracts/` — curated contract packages, one package per folder. Each
-  package owns its own `README.md`, contract source(s), and tests.
+  package owns its own `README.md`, `contract-bundle.json`, contract source(s),
+  and tests.
 - `scripts/` — validation and maintenance helpers (e.g.
   `validate_contracts.py`).
 - `docs/` — repo-local architecture, backlog, and shielded-stack notes.
@@ -92,7 +94,27 @@ uv run pytest -m slow
 ```
 
 If you change a contract's runtime expectations or add a new package, update
-the package-level `README.md` and the table above in the same change.
+the package-level `README.md`, `contract-bundle.json`, and the table above in
+the same change.
+
+## Contracting Hub Imports
+
+`xian-contracts` is the source of truth for reusable standalone contract
+packages. The contracting hub imports immutable snapshots from package-local
+`contract-bundle.json` files instead of treating manual hub entries as
+canonical source.
+
+```bash
+uv run python scripts/validate_contracts.py
+
+uv run --project ../xian-contracting-hub-web \
+  python -m contracting_hub.services.contract_imports \
+  ../xian-contracts/contracts/nameservice/contract-bundle.json \
+  --package-kind standalone
+```
+
+Product-owned systems stay in their product repos. For example, DEX contracts
+belong in `xian-dex`; only DEX-adjacent standalone adapters belong here.
 
 ## Related Docs
 
@@ -102,4 +124,5 @@ the package-level `README.md` and the table above in the same change.
 - [docs/README.md](docs/README.md) — index of internal docs
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — major components and dependency direction
 - [docs/BACKLOG.md](docs/BACKLOG.md) — open work and follow-ups
+- [docs/MANIFESTS.md](docs/MANIFESTS.md) — package manifest standard for hub imports
 - [docs/SHIELDED_STACK.md](docs/SHIELDED_STACK.md) — shielded-asset stack and adapter model

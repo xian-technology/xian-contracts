@@ -1,0 +1,27 @@
+{
+  "schema": "xian.contract_bundle.v1",
+  "schema_version": 1,
+  "name": "xsc005",
+  "display_name": "XSC005 NFT",
+  "version": "0.1.0",
+  "description": "XSC-0005 NFT standard checker and reference collection implementation.",
+  "source": {
+    "repo": "https://github.com/xian-technology/xian-contracts"
+  },
+  "contracts": [
+    {
+      "name": "con_xsc005",
+      "role": "checker",
+      "path": "src/con_xsc005.py",
+      "sha256": "5c46a4ff8987db8404c3534f0fa4a72c173da69c50a9014a835eb7a3be6f1f23",
+      "deploy_order": 10
+    },
+    {
+      "name": "con_xsc005_nft",
+      "role": "reference_collection",
+      "path": "src/con_xsc005_nft.py",
+      "sha256": "d939a6f4456366375459dbe6d79a838e534bf254717e44af83d71f341d770950",
+      "deploy_order": 20
+    }
+  ]
+}

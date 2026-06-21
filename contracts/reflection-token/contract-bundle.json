@@ -1,0 +1,20 @@
+{
+  "schema": "xian.contract_bundle.v1",
+  "schema_version": 1,
+  "name": "reflection-token",
+  "display_name": "Reflection Token",
+  "version": "0.1.0",
+  "description": "Fee-on-transfer reflection token designed to work with the Xian DEX.",
+  "source": {
+    "repo": "https://github.com/xian-technology/xian-contracts"
+  },
+  "contracts": [
+    {
+      "name": "con_reflection_token",
+      "role": "token",
+      "path": "src/con_reflection_token.py",
+      "sha256": "8f28e3b747e17c2933658fc12e7c93903be1b3957bd70f5d4557a4061d8a81a5",
+      "deploy_order": 10
+    }
+  ]
+}

@@ -8,14 +8,17 @@ This folder contains the curated contract packages in `xian-contracts`.
 - `src/` for contract source files
 - `tests/` for package-local tests or explicit testing notes
 - `README.md` in every package as the package entrypoint
+- `contract-bundle.json` in every package as the hub import manifest
 
 ```mermaid
 flowchart LR
   Package["Contract package"] --> Source["src"]
   Package --> Tests["tests"]
   Package --> Readme["README.md"]
+  Package --> Manifest["contract-bundle.json"]
   Package --> Status["curated, candidate, or experimental"]
   Source --> Validation["validate_contracts.py"]
+  Manifest --> Validation
   Tests --> Pytest["pytest"]
 ```
 
@@ -43,6 +46,13 @@ flowchart LR
 - `weighted-lottery/`: ticket-weighted lottery example
 - `xsc001/`: token interface checker
 - `xsc005/`: non-fungible token interface checker and reference collection
+
+## Package Manifests
+
+Every package manifest uses `xian.contract_bundle.v1`. The manifest lists the
+package release version, owner repo, contract names, package-relative source
+paths, source hashes, and deterministic deploy order. See
+[`../docs/MANIFESTS.md`](../docs/MANIFESTS.md) for the full standard.
 
 ## DEX Ownership
 

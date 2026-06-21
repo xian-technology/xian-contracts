@@ -1,0 +1,20 @@
+{
+  "schema": "xian.contract_bundle.v1",
+  "schema_version": 1,
+  "name": "xsc001",
+  "display_name": "XSC001",
+  "version": "0.1.0",
+  "description": "Interface checker for XSC001-style fungible token contracts.",
+  "source": {
+    "repo": "https://github.com/xian-technology/xian-contracts"
+  },
+  "contracts": [
+    {
+      "name": "con_xsc001",
+      "role": "checker",
+      "path": "src/con_xsc001.py",
+      "sha256": "86943a16e3c81e5c6593aec8d6ada284d4d8cc6732f6f1c26192a6a2d2fb3957",
+      "deploy_order": 10
+    }
+  ]
+}

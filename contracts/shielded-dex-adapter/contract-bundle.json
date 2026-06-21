@@ -1,0 +1,20 @@
+{
+  "schema": "xian.contract_bundle.v1",
+  "schema_version": 1,
+  "name": "shielded-dex-adapter",
+  "display_name": "Shielded DEX Adapter",
+  "version": "0.1.0",
+  "description": "Capability-style adapter that lets shielded commands spend through the Xian DEX.",
+  "source": {
+    "repo": "https://github.com/xian-technology/xian-contracts"
+  },
+  "contracts": [
+    {
+      "name": "con_shielded_dex_adapter",
+      "role": "adapter",
+      "path": "src/con_shielded_dex_adapter.py",
+      "sha256": "90bb857e5d013d88566265ad40e91dd5892189d9c7a038493b37e4203a337280",
+      "deploy_order": 10
+    }
+  ]
+}

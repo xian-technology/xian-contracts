@@ -1,0 +1,20 @@
+{
+  "schema": "xian.contract_bundle.v1",
+  "schema_version": 1,
+  "name": "staking",
+  "display_name": "Staking",
+  "version": "0.1.0",
+  "description": "Multi-pool staking contract with reward deposits and emergency controls.",
+  "source": {
+    "repo": "https://github.com/xian-technology/xian-contracts"
+  },
+  "contracts": [
+    {
+      "name": "con_staking",
+      "role": "staking",
+      "path": "src/con_staking.py",
+      "sha256": "76153d39ceb5dc9c5fb64e78411fc85495b425c45e18c4f650470ef81262544f",
+      "deploy_order": 10
+    }
+  ]
+}

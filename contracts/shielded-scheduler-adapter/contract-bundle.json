@@ -1,0 +1,20 @@
+{
+  "schema": "xian.contract_bundle.v1",
+  "schema_version": 1,
+  "name": "shielded-scheduler-adapter",
+  "display_name": "Shielded Scheduler Adapter",
+  "version": "0.1.0",
+  "description": "Capability-style adapter for driving scheduled-actions through shielded commands.",
+  "source": {
+    "repo": "https://github.com/xian-technology/xian-contracts"
+  },
+  "contracts": [
+    {
+      "name": "con_shielded_scheduler_adapter",
+      "role": "adapter",
+      "path": "src/con_shielded_scheduler_adapter.py",
+      "sha256": "58cc5eec0a09ffeeb2c801f0dbb44351cd3dddb0d7b4447d655d94e9c0511c75",
+      "deploy_order": 10
+    }
+  ]
+}

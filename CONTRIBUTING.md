@@ -8,6 +8,7 @@ Every contract package must live under `contracts/<package-name>/` and must
 contain:
 
 - `README.md`
+- `contract-bundle.json`
 - `src/`
 - `tests/`
 
@@ -16,6 +17,7 @@ Use this layout:
 ```text
 contracts/<package-name>/
   README.md
+  contract-bundle.json
   src/
     con_*.py
   tests/
@@ -48,6 +50,21 @@ Each package `README.md` should explain:
 
 Keep the text current-state and concise.
 
+## Package Manifest Expectations
+
+Each package must include `contract-bundle.json` using the
+`xian.contract_bundle.v1` schema documented in
+[`docs/MANIFESTS.md`](docs/MANIFESTS.md). The manifest is the contracting hub
+import contract for that package.
+
+The manifest must:
+
+- use the package folder name as `name`
+- list every `src/con_*.py` file exactly once
+- use deployed contract names that start with `con_`
+- include a stable `role` for each contract artifact
+- store the current SHA-256 hash for every listed source file
+
 ## Status Labels
 
 Use one of these labels in each package README:
@@ -78,5 +95,6 @@ explaining the gap instead of leaving the folder empty.
 When you add or materially change a contract package:
 
 - update the package `README.md`
+- update the package `contract-bundle.json`
 - update the root `README.md` package table if maturity or purpose changed
 - update `docs/BACKLOG.md` if follow-up hardening or testing remains

@@ -1,0 +1,20 @@
+{
+  "schema": "xian.contract_bundle.v1",
+  "schema_version": 1,
+  "name": "shielded-note-token",
+  "display_name": "Shielded Note Token",
+  "version": "0.1.0",
+  "description": "Shielded-note fungible token package built around roots, nullifiers, and note commitments.",
+  "source": {
+    "repo": "https://github.com/xian-technology/xian-contracts"
+  },
+  "contracts": [
+    {
+      "name": "con_shielded_note_token",
+      "role": "token",
+      "path": "src/con_shielded_note_token.py",
+      "sha256": "4ce8840b189ec391e51086f5aca84457cf35c6c1d5e6d38bfe7fa60289fb53cf",
+      "deploy_order": 10
+    }
+  ]
+}

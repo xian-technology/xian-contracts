@@ -1,0 +1,20 @@
+{
+  "schema": "xian.contract_bundle.v1",
+  "schema_version": 1,
+  "name": "lottery",
+  "display_name": "Lottery",
+  "version": "0.1.0",
+  "description": "Simple creator-funded lottery contract.",
+  "source": {
+    "repo": "https://github.com/xian-technology/xian-contracts"
+  },
+  "contracts": [
+    {
+      "name": "con_lottery",
+      "role": "lottery",
+      "path": "src/con_lottery.py",
+      "sha256": "4ea1c0c012f60f80d18d1e9ccaa13d5ff2eeca8a47175c398d96062760354b4a",
+      "deploy_order": 10
+    }
+  ]
+}

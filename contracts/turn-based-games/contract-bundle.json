@@ -1,0 +1,20 @@
+{
+  "schema": "xian.contract_bundle.v1",
+  "schema_version": 1,
+  "name": "turn-based-games",
+  "display_name": "Turn Based Games",
+  "version": "0.1.0",
+  "description": "Generic match registry for turn-based games and off-chain move coordination.",
+  "source": {
+    "repo": "https://github.com/xian-technology/xian-contracts"
+  },
+  "contracts": [
+    {
+      "name": "con_turn_based_games",
+      "role": "match_registry",
+      "path": "src/con_turn_based_games.py",
+      "sha256": "9063ec63d98ad256a1088550d95e1f453ae0202548cab021f6d75e2204ba462e",
+      "deploy_order": 10
+    }
+  ]
+}
