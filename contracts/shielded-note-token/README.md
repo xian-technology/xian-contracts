@@ -14,7 +14,7 @@ commitments, and registry-backed zk verification ids.
 
 ## What It Does
 
-This package is the first real production-shaped privacy-token path in the hub.
+This package is a production-shaped privacy-token path in the hub.
 It does not use public account commitments. Instead it models hidden balances
 as notes in a fixed-capacity append-only tree and stores:
 
@@ -60,10 +60,10 @@ flowchart LR
 - Configured verifying keys are pinned by both `vk_id` and the registry
   `vk_hash`, so a registry-side drift cannot silently change live proof
   semantics for an already configured pool.
-- Users do not supply `new_root`. The contract appends new commitments to
+- Users do not supply `new_root`. The contract appends fresh commitments to
   canonical note storage and recomputes the next root itself.
-- Mutating shielded actions accept any root still inside the bounded accepted
-  root window. Outputs are still appended against canonical current state, so
+- Mutating shielded actions accept any root inside the bounded accepted root
+  window. Outputs append against canonical current state, so
   recent-root proving works without giving up a single chain-owned frontier.
 - Deposit / withdraw amounts are limited to `u64` values so the proof system
   can enforce sound value conservation with bounded note amounts.
@@ -74,21 +74,21 @@ flowchart LR
 - Shielded outputs are addressed to `owner_public`, so a sender only needs the
   recipient's public shielded address, not the recipient's spending secret.
 - The contract can persist optional encrypted note payloads alongside output
-  commitments. The current `v3` statement now also binds per-output payload
-  hashes into the proof so the on-chain payload bytes cannot drift from the
-  proving statement after the fact.
-- Wallet-side key material is now split between a spend key (`owner_secret`)
+  commitments. The `v3` statement binds per-output payload hashes into the proof
+  so the on-chain payload bytes cannot drift from the proving statement after
+  the fact.
+- Wallet-side key material is split between a spend key (`owner_secret`)
   and a viewing key. Optional extra viewers can be disclosed per output using
   the same encrypted payload channel without granting spend authority.
-- Withdraws can now fully exit the shielded pool with zero new output
+- Withdraws can fully exit the shielded pool with zero output
   commitments when the consumed note value matches the public withdraw amount
   exactly.
 - Public balances and shielded supply are tracked separately while keeping a
   total-supply invariant.
 - Proof-related field values use canonical BN254 field-element encodings.
-- The current shielded circuit family is `v3`, built around Merkle auth paths
+- The shielded circuit family is `v3`, built around Merkle auth paths
   plus a chain-owned append frontier rather than whole-tree witnesses.
-- The default tree depth is now `20`, giving a capacity of `1,048,576` notes
+- The default tree depth is `20`, giving a capacity of `1,048,576` notes
   while keeping verifier cost flat and append updates `O(depth)`.
 - Wallet/prover tooling can page commitments from the contract and fetch the
   canonical append frontier separately, which is necessary when a proof uses a
@@ -102,18 +102,17 @@ flowchart LR
 
 ## Caveats
 
-- This is the first real proof-backed version, but it is still `candidate`.
-- The tree depth is still fixed per circuit family, so larger capacities will
-  still require a verifying-key / circuit upgrade rather than a live toggle.
-- The package now has a first wallet-side proving and note-scanning path
-  through `xian-zk`, including state snapshots, record sync, note selection,
-  exact-withdraw planning, separated viewing keys, and a basic disclosed-viewer
-  path. It also now has operator-side bundle metadata and richer
-  registry-manifest generation, but it still lacks an MPC ceremony flow, a
+- Candidate status means proof-backed flows are implemented, with product and
+  launch hardening remaining before broad end-user use.
+- Tree depth is fixed per circuit family, so larger capacities require a
+  verifying-key / circuit upgrade rather than a live toggle.
+- The package includes a wallet-side proving and note-scanning path through
+  `xian-zk`: state snapshots, record sync, note selection, exact-withdraw
+  planning, separated viewing keys, and a basic disclosed-viewer path.
+- Operator-side support includes bundle metadata and registry-manifest
+  generation. Remaining productization gaps include an MPC ceremony flow, a
   polished end-user wallet interface, and a broader network-level
   viewing/disclosure policy.
-- This contract is materially stronger than the earlier privacy-token
-  experiments, but it is not yet a polished end-user privacy asset stack.
 
 ## Validation
 

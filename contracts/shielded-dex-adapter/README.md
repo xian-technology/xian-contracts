@@ -23,7 +23,7 @@ public budget through the Xian DEX.
 - Payloads support either a single `pair` or a multi-hop `path`, plus a
   `recipient`, `amount_out_min`, `deadline`, and optional
   `supporting_fee_on_transfer`.
-- DEX trade fees still depend on the execution signer surface exposed by the
+- DEX trade fees depend on the execution signer surface exposed by the
   DEX itself; the adapter does not override that policy.
 
 ## Validation

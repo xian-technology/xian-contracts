@@ -52,7 +52,7 @@ Pixel-Frames-style art can use the optional PixelGrid extension in
 `con_xsc005_nft.py`. Collections define custom palettes with up to 64 colors,
 lock those palettes for immutability, then mint compact pixel grids where each
 pixel is a single `palette-index-64` character. The palette extension is
-validated on-chain but remains additive; ordinary XSC-0005 wallets can still
+validated on-chain but remains additive; ordinary XSC-0005 wallets can
 read ownership and generic token metadata without understanding PixelGrid.
 
 Marketplace behavior is intentionally an extension. `con_xsc005_nft.py`

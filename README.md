@@ -66,7 +66,7 @@ The default `pytest` path excludes the slow proof-generation tests. Run
 | `contracts/scheduled-actions`        | candidate    | Allowlisted delayed-call scheduler with cancellation and execution controls                          |
 | `contracts/shielded-dex-adapter`     | candidate    | Capability-style adapter that lets shielded commands spend a proof-bound public budget through the DEX |
 | `contracts/shielded-scheduler-adapter` | candidate  | Capability-style adapter that lets shielded commands drive scheduled-actions without a stable user identity |
-| `contracts/stream-payments`          | candidate    | Standalone escrowed token-stream contract extracted from legacy XSC003-style logic                   |
+| `contracts/stream-payments`          | candidate    | Standalone escrowed token-stream contract with upfront funding, claims, shortening, forfeit, and permit relays |
 | `contracts/shielded-note-token`      | candidate    | Root / nullifier / note-based shielded token with registry-backed zk verification ids                |
 | `contracts/xsc005`                   | candidate    | XSC-0005 NFT standard checker and reference collection (the NFT product surface lives in `xian-nft`) |
 | `contracts/reflection-token`         | candidate    | Reflection token designed to integrate with the Xian DEX                                             |
@@ -93,7 +93,7 @@ uv run pytest
 uv run pytest -m slow
 ```
 
-If you change a contract's runtime expectations or add a new package, update
+If you change a contract's runtime expectations or add a package, update
 the package-level `README.md`, `contract-bundle.json`, and the table above in
 the same change.
 
@@ -119,7 +119,7 @@ belong in `xian-dex`; only DEX-adjacent standalone adapters belong here.
 ## Related Docs
 
 - [AGENTS.md](AGENTS.md) — repo-specific guidance for AI agents and contributors
-- [CONTRIBUTING.md](CONTRIBUTING.md) — contribution rules for new and existing packages
+- [CONTRIBUTING.md](CONTRIBUTING.md) — package contribution rules
 - [contracts/README.md](contracts/README.md) — contract package index
 - [docs/README.md](docs/README.md) — index of internal docs
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — major components and dependency direction

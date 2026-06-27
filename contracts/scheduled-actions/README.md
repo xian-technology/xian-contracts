@@ -14,7 +14,7 @@ without embedding bespoke queue logic.
 
 ## Notes
 
-- Execution is still trigger-based. Nothing runs automatically; a caller must
+- Execution is caller-triggered. Nothing runs automatically; a caller must
   execute a due action.
 - Target contracts must be explicitly allowlisted by the operator.
 - Scheduled targets are invoked through a fixed exported

@@ -22,7 +22,7 @@ Capability-style adapter for driving `scheduled-actions` through
 - Later `reschedule` and `cancel` calls must present the same
   `owner_commitment` preimage, so different shielded users can share the same
   controller contract without sharing action authority.
-- The backing scheduler still enforces its own allowlists and timing rules.
+- The backing scheduler enforces its own allowlists and timing rules.
 
 ## Validation
 

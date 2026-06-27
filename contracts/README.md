@@ -25,8 +25,8 @@ flowchart LR
 ## Package Status
 
 - `curated`: documented and validated as a strong starting point
-- `candidate`: useful and documented, but still needs deeper hardening or
-  broader tests
+- `candidate`: useful and documented, with deeper hardening or broader tests
+  required before curated status
 - `experimental`: exploratory or intentionally limited
 
 ## Packages

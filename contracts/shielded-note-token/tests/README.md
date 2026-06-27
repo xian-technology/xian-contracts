@@ -9,7 +9,7 @@ This package uses real Groth16/BN254 proof fixtures for the shielded flows.
 - real transfer proof
 - real withdraw proof
 - invalid-proof rejection
-- old-proof replay rejection
+- spent-proof replay rejection
 - rolling root-window behavior
 
 ## Fixtures
