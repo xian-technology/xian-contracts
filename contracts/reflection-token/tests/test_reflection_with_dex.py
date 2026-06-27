@@ -216,6 +216,14 @@ class TestReflectionTokenWithDex(unittest.TestCase):
         self.assertLessEqual(difference, ContractingDecimal("0.00001"))
 
     def bootstrap_pair(self):
+        registered_lp = self.pairs.registerLpToken(
+            tokenA="con_reflection_token",
+            tokenB="currency",
+            lpToken=REFLECTION_LP_TOKEN,
+            signer=self.operator,
+        )
+        self.assertEqual(registered_lp, REFLECTION_LP_TOKEN)
+
         pair = self.pairs.createPair(
             tokenA="con_reflection_token",
             tokenB="currency",
