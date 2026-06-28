@@ -569,7 +569,7 @@ def withdraw_public_inputs(
 
 
 def assert_escrow_invariant(token):
-    assert token.balance_of(ctx.this) == escrow_balance.get(), (
+    assert token.balance_of(ctx.this) >= escrow_balance.get(), (
         "Escrow invariant broken!"
     )
 
@@ -612,6 +612,16 @@ OperatorChanged = LogEvent(
     {
         "previous_operator": {"type": str, "idx": True},
         "new_operator": {"type": str, "idx": True},
+    },
+)
+
+ShieldedExcessSwept = LogEvent(
+    "ShieldedCommandExcessSwept",
+    {
+        "operator": {"type": str, "idx": True},
+        "recipient": {"type": str, "idx": True},
+        "amount": {"type": int},
+        "escrow_balance": {"type": int},
     },
 )
 
@@ -743,6 +753,15 @@ def asset_id():
 @export
 def get_escrow_balance():
     return escrow_balance.get()
+
+
+@export
+def get_excess_balance():
+    token = token_module()
+    actual_balance = token.balance_of(ctx.this)
+    shielded_balance = escrow_balance.get()
+    assert actual_balance >= shielded_balance, "Escrow invariant broken!"
+    return actual_balance - shielded_balance
 
 
 @export
@@ -995,6 +1014,44 @@ def change_operator(new_operator: str):
 
 
 @export
+def sweep_excess(to: str):
+    require_operator()
+    assert isinstance(to, str) and to != "", "Recipient must be non-empty!"
+    assert to != ctx.this, "Recipient cannot be this contract!"
+
+    acquire_execution_lock()
+    token = token_module()
+    escrow_before = escrow_balance.get()
+    contract_balance_before = token.balance_of(ctx.this)
+    assert contract_balance_before >= escrow_before, "Escrow invariant broken!"
+    excess = contract_balance_before - escrow_before
+    assert excess > 0, "No excess balance to sweep."
+
+    recipient_balance_before = token.balance_of(to)
+    token.transfer(amount=excess, to=to)
+    contract_balance_after = token.balance_of(ctx.this)
+    recipient_balance_after = token.balance_of(to)
+    assert contract_balance_before - contract_balance_after == excess, (
+        "Excess sweep must debit the exact excess amount."
+    )
+    assert recipient_balance_after - recipient_balance_before == excess, (
+        "Excess recipient did not receive the exact amount."
+    )
+    assert_escrow_invariant(token)
+    release_execution_lock()
+
+    ShieldedExcessSwept(
+        {
+            "operator": ctx.caller,
+            "recipient": to,
+            "amount": excess,
+            "escrow_balance": escrow_before,
+        }
+    )
+    return excess
+
+
+@export
 def configure_vk(action: str, vk_id: str):
     require_operator()
     require_action(action)
@@ -1211,9 +1268,10 @@ def execute_command(
     acquire_execution_lock()
     token = token_module()
     contract_balance_before = token.balance_of(ctx.this)
-    assert contract_balance_before >= relayer_fee + public_amount, (
+    assert escrow_balance.get() >= relayer_fee + public_amount, (
         "Escrow balance is too low."
     )
+    assert_escrow_invariant(token)
 
     spend_nullifiers(input_nullifiers)
     new_root = append_output_commitments(
@@ -1321,7 +1379,8 @@ def withdraw_shielded(
     token = token_module()
     contract_balance_before = token.balance_of(ctx.this)
     recipient_balance_before = token.balance_of(to)
-    assert contract_balance_before >= amount, "Escrow balance is too low."
+    assert escrow_balance.get() >= amount, "Escrow balance is too low."
+    assert_escrow_invariant(token)
 
     spend_nullifiers(input_nullifiers)
     new_root = append_output_commitments(

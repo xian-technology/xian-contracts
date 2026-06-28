@@ -531,6 +531,113 @@ class TestShieldedCommands(unittest.TestCase):
             withdraw_proof.output_payload_hashes[0],
         )
 
+    def test_unsolicited_token_transfer_does_not_freeze_pool(self):
+        mallory = "mallory"
+        treasury = "treasury"
+        self.token.mint(amount=3, to=mallory, signer="sys")
+        self.token.transfer(
+            amount=3,
+            to="con_shielded_commands",
+            signer=mallory,
+        )
+        self.assertEqual(self.commands.get_escrow_balance(signer="sys"), 0)
+        self.assertEqual(self.commands.get_excess_balance(signer="sys"), 3)
+
+        deposit_note = ShieldedNote(
+            owner_secret=self.alice_keys.owner_secret,
+            amount=30,
+            rho="0x" + format(1401, "064x"),
+            blind="0x" + format(2401, "064x"),
+        )
+        command_change = ShieldedNote(
+            owner_secret=self.alice_keys.owner_secret,
+            amount=26,
+            rho="0x" + format(1402, "064x"),
+            blind="0x" + format(2402, "064x"),
+        )
+        withdraw_change = ShieldedNote(
+            owner_secret=self.alice_keys.owner_secret,
+            amount=16,
+            rho="0x" + format(1403, "064x"),
+            blind="0x" + format(2403, "064x"),
+        )
+
+        _, deposit_result = self._deposit_note(deposit_note, signer=self.alice)
+        self.assertEqual(self.commands.get_escrow_balance(signer="sys"), 30)
+        self.assertEqual(self.commands.get_excess_balance(signer="sys"), 3)
+
+        commitments_after_deposit, deposit_inputs = self._scan_inputs([deposit_note])
+        command_request = ShieldedCommandRequest(
+            asset_id=self.asset_id,
+            old_root=deposit_result["new_root"],
+            append_state=tree_state(commitments_after_deposit),
+            fee=4,
+            public_amount=0,
+            inputs=deposit_inputs,
+            outputs=[command_change.to_output()],
+            target_contract="con_shielded_target",
+            payload={"increment": 3, "label": "surplus"},
+            relayer=self.relayer,
+            chain_id=self.chain_id,
+            expires_at=Datetime(2026, 1, 1, 12, 20, 0),
+        )
+        command_proof = self.prover.prove_execute(command_request)
+        command_result = self.commands.execute_command(
+            target_contract="con_shielded_target",
+            old_root=command_proof.old_root,
+            input_nullifiers=command_proof.input_nullifiers,
+            output_commitments=command_proof.output_commitments,
+            proof_hex=command_proof.proof_hex,
+            relayer_fee=4,
+            public_amount=0,
+            payload={"increment": 3, "label": "surplus"},
+            expires_at=Datetime(2026, 1, 1, 12, 20, 0),
+            signer=self.relayer,
+            environment=self._environment(Datetime(2026, 1, 1, 12, 5, 0)),
+        )
+
+        self.assertEqual(command_result["result"], 3)
+        self.assertEqual(self.commands.get_escrow_balance(signer="sys"), 26)
+        self.assertEqual(self.commands.get_excess_balance(signer="sys"), 3)
+
+        commitments_after_command, command_inputs = self._scan_inputs([command_change])
+        withdraw_request = ShieldedWithdrawRequest(
+            asset_id=self.asset_id,
+            old_root=command_result["new_root"],
+            append_state=tree_state(commitments_after_command),
+            amount=10,
+            recipient=self.bob,
+            inputs=command_inputs,
+            outputs=[withdraw_change.to_output()],
+        )
+        withdraw_proof = self.prover.prove_withdraw(withdraw_request)
+        self.commands.withdraw_shielded(
+            amount=10,
+            to=self.bob,
+            old_root=withdraw_proof.old_root,
+            input_nullifiers=withdraw_proof.input_nullifiers,
+            output_commitments=withdraw_proof.output_commitments,
+            proof_hex=withdraw_proof.proof_hex,
+            signer=self.alice,
+            environment=self._environment(Datetime(2026, 1, 1, 12, 10, 0)),
+        )
+
+        self.assertEqual(self.token.balance_of(address=self.bob, signer="sys"), 10)
+        self.assertEqual(self.commands.get_escrow_balance(signer="sys"), 16)
+        self.assertEqual(self.commands.get_excess_balance(signer="sys"), 3)
+
+        with self.assertRaises(AssertionError):
+            self.commands.sweep_excess(to=treasury, signer=self.alice)
+
+        swept = self.commands.sweep_excess(to=treasury, signer="sys")
+        self.assertEqual(swept, 3)
+        self.assertEqual(self.token.balance_of(address=treasury, signer="sys"), 3)
+        self.assertEqual(self.commands.get_escrow_balance(signer="sys"), 16)
+        self.assertEqual(self.commands.get_excess_balance(signer="sys"), 0)
+
+        with self.assertRaises(AssertionError):
+            self.commands.sweep_excess(to=treasury, signer="sys")
+
     def test_command_binding_rejects_wrong_relayer_and_replay(self):
         deposit_note = ShieldedNote(
             owner_secret=self.alice_keys.owner_secret,

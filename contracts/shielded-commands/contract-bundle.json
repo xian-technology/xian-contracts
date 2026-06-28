@@ -13,7 +13,7 @@
       "name": "con_shielded_commands",
       "role": "controller",
       "path": "src/con_shielded_commands.py",
-      "sha256": "9a5b2ebc92922f021fbb3d9d4c75ee7cd4c10c82c67b31c85ad6b3b9032478bf",
+      "sha256": "d243483e3fd845e1ad3e27d7a73ed328384141c0aea517385badfad01ead3055",
       "deploy_order": 10
     }
   ]

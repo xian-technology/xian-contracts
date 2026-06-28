@@ -30,8 +30,10 @@ Proof-backed shielded command pool for anonymous relayed contract execution.
 - The configured circuit family is `shielded_command_v4`, and keys are
   expected to carry matching registry metadata for family, statement version,
   tree depth, and IO bounds.
-- The contract requires exact-balance token transfers, so fee-on-transfer or
-  rebasing tokens are not suitable fee assets.
+- The contract requires exact per-operation token transfer deltas, so
+  fee-on-transfer or rebasing tokens are not suitable fee assets. Unsolicited
+  token transfers are treated as excess outside shielded escrow and can be swept
+  by the operator.
 - The privacy boundary is sender privacy and relayed execution, not invisible
   side effects: the target contract call and its public state changes are
   observable on-chain.
