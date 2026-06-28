@@ -37,7 +37,7 @@ flowchart LR
 - `scheduled-actions/`: allowlisted delayed-call scheduler
 - `shielded-commands/`: proof-backed shielded command pool for relayed execution
 - `shielded-dex-adapter/`: capability-style DEX adapter for shielded commands
-- `shielded-scheduler-adapter/`: capability-style scheduler adapter for shielded commands
+- `shielded-scheduler-adapter/`: proof-bound scheduler adapter for shielded commands
 - `shielded-note-token/`: root/nullifier/note-based shielded token contract
 - `reflection-token/`: fee-on-transfer reflection token
 - `stream-payments/`: standalone escrowed token streaming contract

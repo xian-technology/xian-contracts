@@ -29,6 +29,11 @@ The shielded stack in Xian is split into three layers on purpose.
 4. The adapter consumes the active public spend budget, if any, and performs
    the app action.
 
+Some adapters add their own proof-bound authorization on top of the command
+proof. For example, `shielded-scheduler-adapter` stores a public owner
+commitment when scheduling and requires a separate owner proof plus one-time
+authorization nullifier for later `reschedule` and `cancel` calls.
+
 ## Current Limit
 
 - Sender identity can stay unlinkable, but target calls and public side effects

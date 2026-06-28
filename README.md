@@ -65,7 +65,7 @@ The default `pytest` path excludes the slow proof-generation tests. Run
 | `contracts/profile-registry`         | candidate    | Social profile and channel registry scaffold with username resolution                                |
 | `contracts/scheduled-actions`        | candidate    | Allowlisted delayed-call scheduler with cancellation and execution controls                          |
 | `contracts/shielded-dex-adapter`     | candidate    | Capability-style adapter that lets shielded commands spend a proof-bound public budget through the DEX |
-| `contracts/shielded-scheduler-adapter` | candidate  | Capability-style adapter that lets shielded commands drive scheduled-actions without a stable user identity |
+| `contracts/shielded-scheduler-adapter` | candidate  | Proof-bound adapter that lets shielded commands drive scheduled-actions without a caller address |
 | `contracts/stream-payments`          | candidate    | Standalone escrowed token-stream contract with upfront funding, claims, shortening, forfeit, and permit relays |
 | `contracts/shielded-note-token`      | candidate    | Root / nullifier / note-based shielded token with registry-backed zk verification ids                |
 | `contracts/xsc005`                   | candidate    | XSC-0005 NFT standard checker and reference collection (the NFT product surface lives in `xian-nft`) |
