@@ -15,6 +15,9 @@ withdrawal penalties, and emergency controls.
 
 - Pool creators configure stake token, reward token, APY, lock duration, and
   optional entry-fee and penalty rules.
+- Reward deposits back accepted positions: each stake reserves its maximum
+  possible reward before principal is transferred, so underfunded pools cannot
+  accept new stakes.
 - The contract includes emergency pause and recovery controls for the contract
   owner.
 - This package has local automated tests and is one of the stronger maintained

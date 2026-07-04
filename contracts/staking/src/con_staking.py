@@ -49,6 +49,16 @@ def init():
     paused.set(False)
     contract_owner.set(ctx.caller)
 
+def max_reward_for_pool(pool):
+    return pool["stake_amount"] * pool["apy"] / 100.0
+
+def available_rewards(pool):
+    return (
+        pool["total_rewards_deposited"]
+        - pool["total_rewards_reserved"]
+        - pool["total_rewards_paid"]
+    )
+
 @export
 def create_pool(
     stake_token: str,
@@ -102,6 +112,8 @@ def create_pool(
         "entry_fee_amount": entry_fee_amount,
         "entry_fee_token": entry_fee_token,
         "total_rewards_deposited": 0.0,
+        "total_rewards_reserved": 0.0,
+        "total_rewards_paid": 0.0,
         "creator_fees_collected": 0.0,
         "creator_penalties_collected": 0.0
     }
@@ -137,6 +149,9 @@ def stake(pool_id: str):
     
     existing_stake = stakes[pool_id, ctx.caller]
     assert existing_stake is None, "Already staking in this pool"
+
+    reserved_reward = max_reward_for_pool(pool)
+    assert available_rewards(pool) >= reserved_reward, "Insufficient reward funding"
     
     # Handle entry fee
     entry_fee_paid = 0.0
@@ -151,7 +166,6 @@ def stake(pool_id: str):
         
         # Track fees for creator withdrawal
         pool["creator_fees_collected"] = pool["creator_fees_collected"] + entry_fee_paid
-        pools[pool_id] = pool
     
     # Transfer stake tokens
     stake_token = importlib.import_module(pool["stake_token"])
@@ -165,6 +179,7 @@ def stake(pool_id: str):
     stakes[pool_id, ctx.caller] = {
         "amount": pool["stake_amount"],
         "start_time": now,
+        "reserved_reward": reserved_reward,
         "entry_fee_paid": entry_fee_paid
     }
     
@@ -172,6 +187,9 @@ def stake(pool_id: str):
     stats["total_staked"] = stats["total_staked"] + pool["stake_amount"]
     stats["current_positions"] = stats["current_positions"] + 1
     pool_stats[pool_id] = stats
+
+    pool["total_rewards_reserved"] = pool["total_rewards_reserved"] + reserved_reward
+    pools[pool_id] = pool
     
     StakeEvent({
         "pool_id": pool_id,
@@ -203,13 +221,16 @@ def unstake(pool_id: str):
         assert pool["early_withdrawal_enabled"], "Early withdrawal not allowed"
     
     # Calculate rewards (8 decimal precision)
-    max_reward = (stake_info["amount"] * pool["apy"] / 100.0)
+    reserved_reward = stake_info["reserved_reward"]
+    max_reward = reserved_reward
     
     if is_early:
         # Proportional rewards based on time staked
         reward_earned = max_reward * time_staked.seconds / pool["lock_duration"]
     else:
         reward_earned = max_reward
+
+    assert reward_earned <= reserved_reward, "Reward exceeds reserved amount"
     
     # Calculate penalty
     penalty = 0.0
@@ -220,7 +241,6 @@ def unstake(pool_id: str):
         
         # Track penalty for creator withdrawal
         pool["creator_penalties_collected"] = pool["creator_penalties_collected"] + penalty
-        pools[pool_id] = pool
     
     # Calculate final amounts
     stake_return = stake_info["amount"] - penalty
@@ -234,6 +254,10 @@ def unstake(pool_id: str):
     if reward_earned > 0.0:
         reward_token = importlib.import_module(pool["reward_token"])
         reward_token.transfer(amount=reward_earned, to=ctx.caller)
+
+    pool["total_rewards_reserved"] = pool["total_rewards_reserved"] - reserved_reward
+    pool["total_rewards_paid"] = pool["total_rewards_paid"] + reward_earned
+    pools[pool_id] = pool
     
     # Update stats
     stats["total_staked"] = stats["total_staked"] - stake_info["amount"]

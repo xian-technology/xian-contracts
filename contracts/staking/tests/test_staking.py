@@ -88,6 +88,14 @@ def approve(amount: float, to: str):
     def tearDown(self):
         self.client.flush()
 
+    def deposit_pool_rewards(self, pool_id="0", amount=1000.0):
+        self.staking.deposit_rewards(
+            pool_id=pool_id,
+            amount=amount,
+            signer=self.creator,
+            environment={"now": self.test_time},
+        )
+
     # Constructor Tests
     def test_contract_initialization(self):
         """Test contract is properly initialized"""
@@ -289,6 +297,7 @@ def approve(amount: float, to: str):
             signer=self.creator,
             environment={"now": self.test_time},
         )
+        self.deposit_pool_rewards()
 
         # Stake
         result = self.staking.stake(
@@ -324,6 +333,99 @@ def approve(amount: float, to: str):
         self.assertEqual(result["events"][0]["data_indexed"]["pool_id"], "0")
         self.assertEqual(result["events"][0]["data_indexed"]["staker"], self.staker1)
 
+        # Verify max reward liability was reserved for the position
+        pool_info = self.staking.get_pool_info(pool_id="0", signer=self.creator)
+        self.assertEqual(pool_info["config"]["total_rewards_reserved"], 10.0)
+        self.assertEqual(pool_info["config"]["total_rewards_paid"], 0.0)
+
+    def test_stake_rejects_underfunded_reward_pool_without_taking_principal(self):
+        """Test staking fails before principal moves when rewards are not funded."""
+        self.staking.create_pool(
+            stake_token="con_stake_token",
+            reward_token="con_reward_token",
+            apy=50.0,
+            lock_duration=86400,
+            max_positions=100,
+            stake_amount=100.0,
+            signer=self.creator,
+            environment={"now": self.test_time},
+        )
+
+        with self.assertRaises(AssertionError) as context:
+            self.staking.stake(
+                pool_id="0",
+                signer=self.staker1,
+                environment={"now": self.test_time},
+            )
+
+        self.assertIn("Insufficient reward funding", str(context.exception))
+        self.assertEqual(
+            self.stake_token.balance_of(address=self.staker1, signer=self.staker1),
+            10000.0,
+        )
+        self.assertEqual(
+            self.stake_token.balance_of(address="con_staking_test", signer=self.staker1),
+            0.0,
+        )
+        with self.assertRaises(AssertionError):
+            self.staking.get_stake_info(pool_id="0", staker=self.staker1, signer=self.creator)
+
+    def test_reward_reservations_are_not_reused_after_payout(self):
+        """Test paid rewards are not counted as available for new positions."""
+        self.staking.create_pool(
+            stake_token="con_stake_token",
+            reward_token="con_reward_token",
+            apy=10.0,
+            lock_duration=86400,
+            max_positions=2,
+            stake_amount=100.0,
+            signer=self.creator,
+            environment={"now": self.test_time},
+        )
+        self.deposit_pool_rewards(amount=10.0)
+
+        self.staking.stake(
+            pool_id="0",
+            signer=self.staker1,
+            environment={"now": self.test_time},
+        )
+
+        with self.assertRaises(AssertionError) as context:
+            self.staking.stake(
+                pool_id="0",
+                signer=self.staker2,
+                environment={"now": self.test_time},
+            )
+        self.assertIn("Insufficient reward funding", str(context.exception))
+
+        later_time = Datetime(year=2024, month=1, day=2, hour=12, minute=0, second=1)
+        self.staking.unstake(
+            pool_id="0",
+            signer=self.staker1,
+            environment={"now": later_time},
+        )
+        pool_info = self.staking.get_pool_info(pool_id="0", signer=self.creator)
+        self.assertEqual(pool_info["config"]["total_rewards_reserved"], 0.0)
+        self.assertEqual(pool_info["config"]["total_rewards_paid"], 10.0)
+
+        with self.assertRaises(AssertionError) as context:
+            self.staking.stake(
+                pool_id="0",
+                signer=self.staker2,
+                environment={"now": later_time},
+            )
+        self.assertIn("Insufficient reward funding", str(context.exception))
+
+        self.deposit_pool_rewards(amount=10.0)
+        self.staking.stake(
+            pool_id="0",
+            signer=self.staker2,
+            environment={"now": later_time},
+        )
+        pool_info = self.staking.get_pool_info(pool_id="0", signer=self.creator)
+        self.assertEqual(pool_info["config"]["total_rewards_reserved"], 10.0)
+        self.assertEqual(pool_info["config"]["total_rewards_paid"], 10.0)
+
     def test_stake_with_entry_fee(self):
         """Test staking with entry fee"""
         # Create pool with entry fee
@@ -339,6 +441,7 @@ def approve(amount: float, to: str):
             signer=self.creator,
             environment={"now": self.test_time},
         )
+        self.deposit_pool_rewards()
 
         # Stake
         self.staking.stake(
@@ -416,6 +519,7 @@ def approve(amount: float, to: str):
             signer=self.creator,
             environment={"now": self.test_time},
         )
+        self.deposit_pool_rewards(amount=10.0)
 
         # First stake succeeds
         self.staking.stake(
@@ -446,6 +550,7 @@ def approve(amount: float, to: str):
             signer=self.creator,
             environment={"now": self.test_time},
         )
+        self.deposit_pool_rewards()
 
         # First stake succeeds
         self.staking.stake(
@@ -510,6 +615,7 @@ def approve(amount: float, to: str):
             signer=self.creator,
             environment={"now": self.test_time},
         )
+        self.deposit_pool_rewards()
 
         # Stake
         self.staking.stake(
@@ -570,6 +676,7 @@ def approve(amount: float, to: str):
             signer=self.creator,
             environment={"now": self.test_time},
         )
+        self.deposit_pool_rewards()
 
         # Stake
         self.staking.stake(
@@ -644,6 +751,7 @@ def approve(amount: float, to: str):
             signer=self.creator,
             environment={"now": self.test_time},
         )
+        self.deposit_pool_rewards()
 
         # Stake
         self.staking.stake(
@@ -710,6 +818,7 @@ def approve(amount: float, to: str):
             signer=self.creator,
             environment={"now": self.test_time},
         )
+        self.deposit_pool_rewards()
 
         self.staking.stake(
             pool_id="0",
@@ -754,6 +863,8 @@ def approve(amount: float, to: str):
         # Verify rewards deposited
         pool_info = self.staking.get_pool_info(pool_id="0", signer=self.creator)
         self.assertEqual(pool_info["config"]["total_rewards_deposited"], 1000.0)
+        self.assertEqual(pool_info["config"]["total_rewards_reserved"], 0.0)
+        self.assertEqual(pool_info["config"]["total_rewards_paid"], 0.0)
 
         # Verify token transfer
         self.assertEqual(
@@ -921,6 +1032,7 @@ def approve(amount: float, to: str):
             signer=self.creator,
             environment={"now": self.test_time},
         )
+        self.deposit_pool_rewards()
 
         # Stake
         self.staking.stake(
@@ -957,6 +1069,7 @@ def approve(amount: float, to: str):
             signer=self.creator,
             environment={"now": self.test_time},
         )
+        self.deposit_pool_rewards()
 
         # Stake
         self.staking.stake(
@@ -1106,6 +1219,8 @@ def approve(amount: float, to: str):
             signer=self.creator,
             environment={"now": self.test_time},
         )
+        self.deposit_pool_rewards(pool_id="0", amount=20.0)
+        self.deposit_pool_rewards(pool_id="1", amount=40.0)
 
         # Stake in both pools
         self.staking.stake(
