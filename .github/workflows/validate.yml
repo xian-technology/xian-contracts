@@ -13,22 +13,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout xian-contracts
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           path: xian-contracts
 
       - name: Checkout xian-contracting
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: ${{ github.repository_owner }}/xian-contracting
           ref: main
           path: xian-contracting
 
       - name: Use matching xian-contracting branch when available
+        env:
+          MATCHING_BRANCH: ${{ github.head_ref || github.ref_name }}
         shell: bash
         run: |
           set -euo pipefail
-          BRANCH="${{ github.head_ref || github.ref_name }}"
+          BRANCH="${MATCHING_BRANCH}"
           REMOTE="https://github.com/${{ github.repository_owner }}/xian-contracting"
           if git ls-remote --exit-code --heads "$REMOTE" "$BRANCH" >/dev/null 2>&1; then
             git -C xian-contracting fetch --depth=1 origin "$BRANCH"
@@ -36,24 +38,26 @@ jobs:
           fi
 
       - name: Checkout xian-linter
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: ${{ github.repository_owner }}/xian-linter
           ref: main
           path: xian-linter
 
       - name: Checkout xian-configs
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: ${{ github.repository_owner }}/xian-configs
           ref: main
           path: xian-configs
 
       - name: Use matching xian-configs branch when available
+        env:
+          MATCHING_BRANCH: ${{ github.head_ref || github.ref_name }}
         shell: bash
         run: |
           set -euo pipefail
-          BRANCH="${{ github.head_ref || github.ref_name }}"
+          BRANCH="${MATCHING_BRANCH}"
           REMOTE="https://github.com/${{ github.repository_owner }}/xian-configs"
           if git ls-remote --exit-code --heads "$REMOTE" "$BRANCH" >/dev/null 2>&1; then
             git -C xian-configs fetch --depth=1 origin "$BRANCH"
@@ -66,7 +70,7 @@ jobs:
           python-version: "3.14"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@v8
 
       - name: Sync dependencies
         working-directory: xian-contracts
