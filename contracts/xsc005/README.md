@@ -58,7 +58,9 @@ read ownership and generic token metadata without understanding PixelGrid.
 Marketplace behavior is intentionally an extension. `con_xsc005_nft.py`
 includes listing, buying, and royalty helpers because they are useful for
 Pixel-Frames-like collections, but XSC-0005 compliance only depends on the core
-NFT surface.
+NFT surface. The reference marketplace accepts only the seeded chain
+`currency` contract for settlement; arbitrary interface-compatible contracts
+are rejected because interface shape alone cannot prove value transfer.
 
 ## Validation
 

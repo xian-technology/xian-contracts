@@ -41,7 +41,7 @@ flowchart LR
 - `shielded-note-token/`: root/nullifier/note-based shielded token contract
 - `reflection-token/`: fee-on-transfer reflection token
 - `stream-payments/`: standalone escrowed token streaming contract
-- `staking/`: multi-pool staking system
+- `staking/`: annualized multi-pool staking with explicit custody liabilities
 - `turn-based-games/`: generic turn-based match registry
 - `weighted-lottery/`: ticket-weighted lottery example
 - `xsc001/`: token interface checker

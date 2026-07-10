@@ -51,8 +51,10 @@ RESERVED_TOKEN_FIELDS = [
 TOKEN_PAYMENT_INTERFACE = [
     importlib.Func("transfer_from", args=("amount", "to", "main_account")),
 ]
+MARKETPLACE_PAYMENT_TOKEN = "currency"
 
 collection_operator = Variable()
+marketplace_payment_token = Variable()
 token_count = Variable(default_value=0)
 
 owners = Hash(default_value="")
@@ -156,6 +158,14 @@ def seed(
         operator_address = ctx.caller
 
     collection_operator.set(operator_address)
+    assert importlib.exists(MARKETPLACE_PAYMENT_TOKEN), (
+        "Seeded marketplace payment token does not exist."
+    )
+    assert importlib.enforce_interface(
+        MARKETPLACE_PAYMENT_TOKEN,
+        TOKEN_PAYMENT_INTERFACE,
+    ), "Seeded marketplace payment token does not satisfy the required interface."
+    marketplace_payment_token.set(MARKETPLACE_PAYMENT_TOKEN)
     metadata["standard"] = "XSC-0005"
     metadata["collection_name"] = normalize_text(
         collection_name,
@@ -460,6 +470,9 @@ def clear_listing(token_id: str):
 
 
 def require_payment_token(currency_contract: str):
+    assert currency_contract == marketplace_payment_token.get(), (
+        "Unsupported marketplace payment token."
+    )
     assert importlib.exists(currency_contract), "Payment token contract does not exist."
     assert importlib.enforce_interface(currency_contract, TOKEN_PAYMENT_INTERFACE), (
         "Payment token contract does not satisfy the required interface."
@@ -895,8 +908,14 @@ def contract_metadata():
         "collection_image": metadata["collection_image"],
         "collection_website": metadata["collection_website"],
         "operator": metadata["operator"],
+        "marketplace_payment_token": marketplace_payment_token.get(),
         "token_count": token_count.get(),
     }
+
+
+@export
+def payment_token_contract():
+    return marketplace_payment_token.get()
 
 
 @export

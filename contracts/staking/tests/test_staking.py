@@ -1,8 +1,30 @@
+import ast
 import unittest
 from pathlib import Path
 
 from contracting.local import ContractingClient
 from xian_runtime_types.time import Datetime
+
+SECONDS_PER_YEAR = 31_536_000
+
+
+class TestStakingSourceCompatibility(unittest.TestCase):
+    def test_storage_hashes_are_not_passed_to_helpers(self):
+        """Native VM storage references must be accessed directly, not passed as values."""
+        contract_path = Path(__file__).resolve().parents[1] / "src" / "con_staking.py"
+        tree = ast.parse(contract_path.read_text())
+        liability_hashes = {
+            "principal_liabilities",
+            "reward_liabilities",
+            "creator_liabilities",
+        }
+        violations = []
+        for call in (node for node in ast.walk(tree) if isinstance(node, ast.Call)):
+            for argument in [*call.args, *(item.value for item in call.keywords)]:
+                if isinstance(argument, ast.Name) and argument.id in liability_hashes:
+                    violations.append((argument.id, argument.lineno))
+
+        self.assertEqual(violations, [])
 
 
 class TestStakingContract(unittest.TestCase):
@@ -96,6 +118,9 @@ def approve(amount: float, to: str):
             environment={"now": self.test_time},
         )
 
+    def annualized_reward(self, stake_amount=100.0, apy=10.0, lock_duration=86400):
+        return stake_amount * apy / 100.0 * lock_duration / SECONDS_PER_YEAR
+
     # Constructor Tests
     def test_contract_initialization(self):
         """Test contract is properly initialized"""
@@ -103,6 +128,10 @@ def approve(amount: float, to: str):
         self.assertEqual(status["owner"], "sys")
         self.assertEqual(status["paused"], False)
         self.assertEqual(status["total_pools"], 0)
+        self.assertEqual(status["reward_model"], "annualized_v1")
+        self.assertEqual(status["min_lock_duration"], 3600)
+        self.assertEqual(status["max_lock_duration"], SECONDS_PER_YEAR)
+        self.assertEqual(status["max_apy"], 100.0)
 
     # Create Pool Tests
     def test_create_pool_success(self):
@@ -154,6 +183,7 @@ def approve(amount: float, to: str):
         self.assertEqual(pool_info["config"]["penalty_rate"], 0.2)
         self.assertEqual(pool_info["config"]["entry_fee_amount"], 10.0)
         self.assertEqual(pool_info["config"]["early_withdrawal_enabled"], False)
+        self.assertEqual(pool_info["config"]["reward_model"], "annualized_v1")
 
     def test_create_pool_invalid_apy(self):
         """Test pool creation with negative APY fails"""
@@ -168,7 +198,20 @@ def approve(amount: float, to: str):
                 signer=self.creator,
                 environment={"now": self.test_time},
             )
-        self.assertIn("APY must be non-negative", str(context.exception))
+        self.assertIn("APY must be between 0 and 100", str(context.exception))
+
+        with self.assertRaises(AssertionError) as context:
+            self.staking.create_pool(
+                stake_token="con_stake_token",
+                reward_token="con_reward_token",
+                apy=100.01,
+                lock_duration=86400,
+                max_positions=100,
+                stake_amount=100.0,
+                signer=self.creator,
+                environment={"now": self.test_time},
+            )
+        self.assertIn("APY must be between 0 and 100", str(context.exception))
 
     def test_create_pool_invalid_lock_duration(self):
         """Test pool creation with zero lock duration fails"""
@@ -183,7 +226,20 @@ def approve(amount: float, to: str):
                 signer=self.creator,
                 environment={"now": self.test_time},
             )
-        self.assertIn("Lock duration must be positive", str(context.exception))
+        self.assertIn("Lock duration must be at least 3600 seconds", str(context.exception))
+
+        with self.assertRaises(AssertionError) as context:
+            self.staking.create_pool(
+                stake_token="con_stake_token",
+                reward_token="con_reward_token",
+                apy=10.0,
+                lock_duration=SECONDS_PER_YEAR + 1,
+                max_positions=100,
+                stake_amount=100.0,
+                signer=self.creator,
+                environment={"now": self.test_time},
+            )
+        self.assertIn("Lock duration must not exceed 31536000 seconds", str(context.exception))
 
     def test_create_pool_invalid_max_positions(self):
         """Test pool creation with zero max positions fails"""
@@ -335,8 +391,14 @@ def approve(amount: float, to: str):
 
         # Verify max reward liability was reserved for the position
         pool_info = self.staking.get_pool_info(pool_id="0", signer=self.creator)
-        self.assertEqual(pool_info["config"]["total_rewards_reserved"], 10.0)
+        self.assertAlmostEqual(
+            float(pool_info["config"]["total_rewards_reserved"]),
+            self.annualized_reward(),
+            places=12,
+        )
         self.assertEqual(pool_info["config"]["total_rewards_paid"], 0.0)
+        liabilities = self.staking.get_token_liability(token_contract="con_stake_token")
+        self.assertEqual(liabilities["principal"], 100.0)
 
     def test_stake_rejects_underfunded_reward_pool_without_taking_principal(self):
         """Test staking fails before principal moves when rewards are not funded."""
@@ -382,7 +444,7 @@ def approve(amount: float, to: str):
             signer=self.creator,
             environment={"now": self.test_time},
         )
-        self.deposit_pool_rewards(amount=10.0)
+        self.deposit_pool_rewards(amount=0.03)
 
         self.staking.stake(
             pool_id="0",
@@ -406,7 +468,11 @@ def approve(amount: float, to: str):
         )
         pool_info = self.staking.get_pool_info(pool_id="0", signer=self.creator)
         self.assertEqual(pool_info["config"]["total_rewards_reserved"], 0.0)
-        self.assertEqual(pool_info["config"]["total_rewards_paid"], 10.0)
+        self.assertAlmostEqual(
+            float(pool_info["config"]["total_rewards_paid"]),
+            self.annualized_reward(),
+            places=12,
+        )
 
         with self.assertRaises(AssertionError) as context:
             self.staking.stake(
@@ -416,15 +482,23 @@ def approve(amount: float, to: str):
             )
         self.assertIn("Insufficient reward funding", str(context.exception))
 
-        self.deposit_pool_rewards(amount=10.0)
+        self.deposit_pool_rewards(amount=0.03)
         self.staking.stake(
             pool_id="0",
             signer=self.staker2,
             environment={"now": later_time},
         )
         pool_info = self.staking.get_pool_info(pool_id="0", signer=self.creator)
-        self.assertEqual(pool_info["config"]["total_rewards_reserved"], 10.0)
-        self.assertEqual(pool_info["config"]["total_rewards_paid"], 10.0)
+        self.assertAlmostEqual(
+            float(pool_info["config"]["total_rewards_reserved"]),
+            self.annualized_reward(),
+            places=12,
+        )
+        self.assertAlmostEqual(
+            float(pool_info["config"]["total_rewards_paid"]),
+            self.annualized_reward(),
+            places=12,
+        )
 
     def test_stake_with_entry_fee(self):
         """Test staking with entry fee"""
@@ -642,10 +716,11 @@ def approve(amount: float, to: str):
         )
 
         # Verify rewards received
-        self.assertEqual(
-            self.reward_token.balance_of(address=self.staker1, signer=self.staker1),
-            10.0,
-        )  # 10% APY
+        self.assertAlmostEqual(
+            float(self.reward_token.balance_of(address=self.staker1, signer=self.staker1)),
+            self.annualized_reward(),
+            places=12,
+        )
 
         # Verify event emission - check data_indexed for indexed fields
         self.assertEqual(result["events"][0]["event"], "Unstake")
@@ -704,11 +779,12 @@ def approve(amount: float, to: str):
         )
 
         # Verify partial rewards (50% of time = 50% of rewards)
-        expected_rewards = 10.0 * 0.5  # 5.0
-        self.assertEqual(
-            self.reward_token.balance_of(address=self.staker1, signer=self.staker1),
+        expected_rewards = self.annualized_reward() * 0.5
+        self.assertAlmostEqual(
+            float(self.reward_token.balance_of(address=self.staker1, signer=self.staker1)),
             expected_rewards,
-            "Reward amount mismatch",
+            places=12,
+            msg="Reward amount mismatch",
         )
 
         # Verify penalty applied (50% remaining time * 10% penalty = 5% penalty on stake)
@@ -976,6 +1052,12 @@ def approve(amount: float, to: str):
         initial_stake_balance = self.stake_token.balance_of(
             address=self.creator, signer=self.creator
         )
+        fee_liability = self.staking.get_token_liability(token_contract="con_fee_token")
+        penalty_liability = self.staking.get_token_liability(
+            token_contract="con_stake_token"
+        )
+        self.assertEqual(fee_liability["creator"], 10.0)
+        self.assertEqual(penalty_liability["creator"], 7.5)
 
         self.staking.withdraw_creator_fees(
             pool_id="0",
@@ -995,6 +1077,14 @@ def approve(amount: float, to: str):
         pool_info = self.staking.get_pool_info(pool_id="0", signer=self.creator)
         self.assertEqual(pool_info["config"]["creator_fees_collected"], 0.0)
         self.assertEqual(pool_info["config"]["creator_penalties_collected"], 0.0)
+        self.assertEqual(
+            self.staking.get_token_liability(token_contract="con_fee_token")["creator"],
+            0.0,
+        )
+        self.assertEqual(
+            self.staking.get_token_liability(token_contract="con_stake_token")["creator"],
+            0.0,
+        )
 
     def test_withdraw_creator_fees_not_creator(self):
         """Test withdrawing fees by non-creator fails"""
@@ -1050,8 +1140,12 @@ def approve(amount: float, to: str):
             environment={"now": later_time},
         )
 
-        self.assertEqual(rewards["current_reward"], 10.0)  # 10% APY
-        self.assertEqual(rewards["max_reward"], 10.0)
+        self.assertAlmostEqual(
+            float(rewards["current_reward"]), self.annualized_reward(), places=12
+        )
+        self.assertAlmostEqual(
+            float(rewards["max_reward"]), self.annualized_reward(), places=12
+        )
         self.assertEqual(rewards["potential_penalty"], 0.0)
         self.assertEqual(rewards["is_early"], False)
 
@@ -1087,8 +1181,12 @@ def approve(amount: float, to: str):
             environment={"now": partial_time},
         )
 
-        self.assertEqual(rewards["current_reward"], 5.0)  # 50% of 10%
-        self.assertEqual(rewards["max_reward"], 10.0)
+        self.assertAlmostEqual(
+            float(rewards["current_reward"]), self.annualized_reward() * 0.5, places=12
+        )
+        self.assertAlmostEqual(
+            float(rewards["max_reward"]), self.annualized_reward(), places=12
+        )
         self.assertEqual(rewards["potential_penalty"], 5.0)  # 50% time remaining * 10% penalty
         self.assertEqual(rewards["is_early"], True)
 
@@ -1127,6 +1225,68 @@ def approve(amount: float, to: str):
 
         final_balance = self.stake_token.balance_of(address=self.owner, signer=self.owner)
         self.assertEqual(final_balance, initial_balance + 500.0)
+        self.assertEqual(
+            self.staking.get_recoverable_excess(token_contract="con_stake_token"),
+            500.0,
+        )
+
+    def test_emergency_recovery_protects_principal_and_rewards(self):
+        self.staking.create_pool(
+            stake_token="con_stake_token",
+            reward_token="con_reward_token",
+            apy=10.0,
+            lock_duration=86400,
+            max_positions=1,
+            stake_amount=100.0,
+            signer=self.creator,
+            environment={"now": self.test_time},
+        )
+        self.deposit_pool_rewards(amount=1000.0)
+        self.staking.stake(
+            pool_id="0",
+            signer=self.staker1,
+            environment={"now": self.test_time},
+        )
+
+        stake_liability = self.staking.get_token_liability(
+            token_contract="con_stake_token"
+        )
+        reward_liability = self.staking.get_token_liability(
+            token_contract="con_reward_token"
+        )
+        self.assertEqual(stake_liability["principal"], 100.0)
+        self.assertEqual(stake_liability["total"], 100.0)
+        self.assertEqual(reward_liability["rewards"], 1000.0)
+        self.assertEqual(reward_liability["total"], 1000.0)
+
+        self.staking.emergency_pause(signer=self.owner)
+        with self.assertRaisesRegex(AssertionError, "Amount exceeds recoverable excess"):
+            self.staking.emergency_withdraw_token(
+                token_contract="con_stake_token",
+                amount=1.0,
+                signer=self.owner,
+            )
+        with self.assertRaisesRegex(AssertionError, "Amount exceeds recoverable excess"):
+            self.staking.emergency_withdraw_token(
+                token_contract="con_reward_token",
+                amount=1.0,
+                signer=self.owner,
+            )
+
+        self.stake_token.transfer(amount=50.0, to="con_staking_test", signer=self.owner)
+        self.assertEqual(
+            self.staking.get_recoverable_excess(token_contract="con_stake_token"),
+            50.0,
+        )
+        self.staking.emergency_withdraw_token(
+            token_contract="con_stake_token",
+            amount=50.0,
+            signer=self.owner,
+        )
+        self.assertEqual(
+            self.stake_token.balance_of(address="con_staking_test"),
+            100.0,
+        )
 
     def test_emergency_withdraw_not_owner(self):
         """Test emergency withdrawal by non-owner fails"""
