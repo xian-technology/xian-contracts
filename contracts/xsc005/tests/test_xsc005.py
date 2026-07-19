@@ -42,6 +42,16 @@ def balance_of(address: str):
     return balances[address]
 """
 
+NOOP_PAYMENT_TOKEN = """
+@construct
+def seed():
+    pass
+
+@export
+def transfer_from(amount: Any, to: str, main_account: str):
+    return True
+"""
+
 INVALID_NFT = """
 owners = Hash(default_value="")
 balances = Hash(default_value=0)
@@ -66,6 +76,7 @@ class TestXSC005(unittest.TestCase):
         self.client.flush()
 
         self.client.submit(PAYMENT_TOKEN, name="currency")
+        self.client.submit(NOOP_PAYMENT_TOKEN, name="con_noop_money")
         with CHECKER_PATH.open() as f:
             self.client.submit(f.read(), name="con_xsc005")
         with REFERENCE_PATH.open() as f:
@@ -112,6 +123,24 @@ class TestXSC005(unittest.TestCase):
     def test_reference_contract_passes_xsc005_checker(self):
         self.assertTrue(self.standard.is_XSC005(contract="con_xsc005_nft", signer="sys"))
         self.assertFalse(self.standard.is_XSC005(contract="con_invalid_nft", signer="sys"))
+        self.assertEqual(self.nft.payment_token_contract(), "currency")
+
+    def test_marketplace_rejects_arbitrary_noop_payment_token(self):
+        self.mint_inline()
+
+        with self.assertRaisesRegex(
+            AssertionError,
+            "Unsupported marketplace payment token",
+        ):
+            self.nft.list_for_sale(
+                token_id="pixel-1",
+                currency_contract="con_noop_money",
+                price=100,
+                signer=self.alice,
+            )
+
+        self.assertEqual(self.nft.owner_of(token_id="pixel-1"), self.alice)
+        self.assertEqual(self.nft.listing_info(token_id="pixel-1")["seller"], "")
 
     def test_mint_stores_on_chain_content_and_metadata(self):
         self.mint_inline()

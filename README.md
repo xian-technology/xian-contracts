@@ -60,7 +60,7 @@ The default `pytest` path excludes the slow proof-generation tests. Run
 | Package                              | Status       | Purpose                                                                                              |
 | ------------------------------------ | ------------ | ---------------------------------------------------------------------------------------------------- |
 | `contracts/nameservice`              | curated      | Manager-governed name registry with renewal and primary-name mapping                                 |
-| `contracts/staking`                  | curated      | Multi-pool staking contract with reward deposits and emergency controls                              |
+| `contracts/staking`                  | curated      | Annualized multi-pool staking with funded rewards, custody liabilities, and excess-only recovery      |
 | `contracts/xsc001`                   | curated      | Token interface checker contract                                                                     |
 | `contracts/profile-registry`         | candidate    | Social profile and channel registry scaffold with username resolution                                |
 | `contracts/scheduled-actions`        | candidate    | Allowlisted delayed-call scheduler with cancellation and execution controls                          |

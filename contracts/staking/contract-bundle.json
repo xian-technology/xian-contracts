@@ -4,7 +4,7 @@
   "name": "staking",
   "display_name": "Staking",
   "version": "0.1.0",
-  "description": "Multi-pool staking contract with reward deposits and emergency controls.",
+  "description": "Annualized multi-pool staking with funded rewards, custody liabilities, and excess-only recovery.",
   "source": {
     "repo": "https://github.com/xian-technology/xian-contracts"
   },
@@ -13,7 +13,7 @@
       "name": "con_staking",
       "role": "staking",
       "path": "src/con_staking.py",
-      "sha256": "ab0fd10edc82191972fb37ff5a3c7fd00e7df1f2d9f8a8f75c14b417cdf35822",
+      "sha256": "40be088c0056bf32a6f8e8b622ee05789715bbb6f0a2c7132775060e7c0f512e",
       "deploy_order": 10
     }
   ]

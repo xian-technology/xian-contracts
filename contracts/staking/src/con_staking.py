@@ -1,4 +1,10 @@
 # General Multi-Token Staking Contract
+SECONDS_PER_YEAR = 31536000
+MIN_LOCK_DURATION = 3600
+MAX_LOCK_DURATION = 31536000
+MAX_APY = 100.0
+REWARD_MODEL = "annualized_v1"
+
 # State Variables
 pools = Hash()
 stakes = Hash()
@@ -6,6 +12,9 @@ pool_counter = Variable()
 paused = Variable()
 contract_owner = Variable()
 pool_stats = Hash()
+principal_liabilities = Hash(default_value=0.0)
+reward_liabilities = Hash(default_value=0.0)
+creator_liabilities = Hash(default_value=0.0)
 
 # Events
 PoolCreatedEvent = LogEvent(
@@ -49,8 +58,64 @@ def init():
     paused.set(False)
     contract_owner.set(ctx.caller)
 
+
+def annualized_reward(stake_amount, apy, lock_duration):
+    return stake_amount * apy / 100.0 * lock_duration / SECONDS_PER_YEAR
+
+
 def max_reward_for_pool(pool):
-    return pool["stake_amount"] * pool["apy"] / 100.0
+    return annualized_reward(
+        pool["stake_amount"],
+        pool["apy"],
+        pool["lock_duration"],
+    )
+
+
+def increase_principal_liability(token_contract, amount):
+    if amount > 0.0:
+        principal_liabilities[token_contract] = principal_liabilities[token_contract] + amount
+
+
+def decrease_principal_liability(token_contract, amount):
+    if amount <= 0.0:
+        return
+    current = principal_liabilities[token_contract]
+    assert current >= amount, "Liability accounting underflow"
+    principal_liabilities[token_contract] = current - amount
+
+
+def increase_reward_liability(token_contract, amount):
+    if amount > 0.0:
+        reward_liabilities[token_contract] = reward_liabilities[token_contract] + amount
+
+
+def decrease_reward_liability(token_contract, amount):
+    if amount <= 0.0:
+        return
+    current = reward_liabilities[token_contract]
+    assert current >= amount, "Liability accounting underflow"
+    reward_liabilities[token_contract] = current - amount
+
+
+def increase_creator_liability(token_contract, amount):
+    if amount > 0.0:
+        creator_liabilities[token_contract] = creator_liabilities[token_contract] + amount
+
+
+def decrease_creator_liability(token_contract, amount):
+    if amount <= 0.0:
+        return
+    current = creator_liabilities[token_contract]
+    assert current >= amount, "Liability accounting underflow"
+    creator_liabilities[token_contract] = current - amount
+
+
+def total_liability_for_token(token_contract):
+    return (
+        principal_liabilities[token_contract]
+        + reward_liabilities[token_contract]
+        + creator_liabilities[token_contract]
+    )
 
 def available_rewards(pool):
     return (
@@ -81,8 +146,9 @@ def create_pool(
         entry_fee_amount = 0.0
 
     assert not paused.get(), "Contract is paused"
-    assert apy >= 0.0, "APY must be non-negative"
-    assert lock_duration > 0, "Lock duration must be positive"
+    assert apy >= 0.0 and apy <= MAX_APY, "APY must be between 0 and 100"
+    assert lock_duration >= MIN_LOCK_DURATION, "Lock duration must be at least 3600 seconds"
+    assert lock_duration <= MAX_LOCK_DURATION, "Lock duration must not exceed 31536000 seconds"
     assert max_positions > 0, "Max positions must be positive"
     assert stake_amount > 0.0, "Stake amount must be positive"
     assert penalty_rate >= 0.0 and penalty_rate <= 1.0, "Penalty rate must be 0-100%"
@@ -103,6 +169,7 @@ def create_pool(
         "stake_token": stake_token,
         "reward_token": reward_token,
         "apy": apy,
+        "reward_model": REWARD_MODEL,
         "lock_duration": lock_duration,
         "max_positions": max_positions,
         "stake_amount": stake_amount,
@@ -163,6 +230,10 @@ def stake(pool_id: str):
             main_account=ctx.caller
         )
         entry_fee_paid = pool["entry_fee_amount"]
+        increase_creator_liability(
+            pool["entry_fee_token"],
+            entry_fee_paid,
+        )
         
         # Track fees for creator withdrawal
         pool["creator_fees_collected"] = pool["creator_fees_collected"] + entry_fee_paid
@@ -174,6 +245,7 @@ def stake(pool_id: str):
         to=ctx.this,
         main_account=ctx.caller
     )
+    increase_principal_liability(pool["stake_token"], pool["stake_amount"])
     
     # Record stake
     stakes[pool_id, ctx.caller] = {
@@ -249,11 +321,14 @@ def unstake(pool_id: str):
     if stake_return > 0.0:
         stake_token = importlib.import_module(pool["stake_token"])
         stake_token.transfer(amount=stake_return, to=ctx.caller)
+    decrease_principal_liability(pool["stake_token"], stake_info["amount"])
+    increase_creator_liability(pool["stake_token"], penalty)
     
     # Transfer rewards
     if reward_earned > 0.0:
         reward_token = importlib.import_module(pool["reward_token"])
         reward_token.transfer(amount=reward_earned, to=ctx.caller)
+        decrease_reward_liability(pool["reward_token"], reward_earned)
 
     pool["total_rewards_reserved"] = pool["total_rewards_reserved"] - reserved_reward
     pool["total_rewards_paid"] = pool["total_rewards_paid"] + reward_earned
@@ -291,6 +366,7 @@ def deposit_rewards(pool_id: str, amount: float):
         to=ctx.this,
         main_account=ctx.caller
     )
+    increase_reward_liability(pool["reward_token"], amount)
     
     # Update pool rewards
     pool["total_rewards_deposited"] = pool["total_rewards_deposited"] + amount
@@ -310,12 +386,14 @@ def withdraw_creator_fees(pool_id: str):
     if total_fees > 0.0 and pool["entry_fee_token"] is not None:
         fee_token = importlib.import_module(pool["entry_fee_token"])
         fee_token.transfer(amount=total_fees, to=ctx.caller)
+        decrease_creator_liability(pool["entry_fee_token"], total_fees)
         pool["creator_fees_collected"] = 0.0
     
     # Withdraw penalties (in stake token)
     if total_penalties > 0.0:
         stake_token = importlib.import_module(pool["stake_token"])
         stake_token.transfer(amount=total_penalties, to=ctx.caller)
+        decrease_creator_liability(pool["stake_token"], total_penalties)
         pool["creator_penalties_collected"] = 0.0
     
     pools[pool_id] = pool
@@ -351,7 +429,7 @@ def calculate_rewards(pool_id: str, staker: str):
     is_early = time_staked.seconds < pool["lock_duration"]
     
     # Calculate potential rewards
-    max_reward = (stake_info["amount"] * pool["apy"] / 100.0)
+    max_reward = stake_info["reserved_reward"]
     
     if is_early:
         current_reward = max_reward * time_staked.seconds / pool["lock_duration"]
@@ -389,14 +467,44 @@ def emergency_unpause():
 def emergency_withdraw_token(token_contract: str, amount: float):
     assert ctx.caller == contract_owner.get(), "Only contract owner can emergency withdraw"
     assert paused.get(), "Contract must be paused for emergency withdrawal"
-    
+    assert amount > 0.0, "Amount must be positive"
+
     token = importlib.import_module(token_contract)
+    balance = token.balance_of(address=ctx.this)
+    recoverable = balance - total_liability_for_token(token_contract)
+    assert recoverable >= amount, "Amount exceeds recoverable excess"
     token.transfer(amount=amount, to=ctx.caller)
+
+
+@export
+def get_token_liability(token_contract: str):
+    principal = principal_liabilities[token_contract]
+    rewards = reward_liabilities[token_contract]
+    creator = creator_liabilities[token_contract]
+    return {
+        "principal": principal,
+        "rewards": rewards,
+        "creator": creator,
+        "total": principal + rewards + creator,
+    }
+
+
+@export
+def get_recoverable_excess(token_contract: str):
+    token = importlib.import_module(token_contract)
+    recoverable = token.balance_of(address=ctx.this) - total_liability_for_token(token_contract)
+    if recoverable < 0.0:
+        return 0.0
+    return recoverable
 
 @export
 def get_contract_status():
     return {
         "paused": paused.get(),
         "owner": contract_owner.get(),
-        "total_pools": pool_counter.get()
+        "total_pools": pool_counter.get(),
+        "reward_model": REWARD_MODEL,
+        "min_lock_duration": MIN_LOCK_DURATION,
+        "max_lock_duration": MAX_LOCK_DURATION,
+        "max_apy": MAX_APY,
     }
