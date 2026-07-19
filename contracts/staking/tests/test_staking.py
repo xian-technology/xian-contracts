@@ -1053,9 +1053,7 @@ def approve(amount: float, to: str):
             address=self.creator, signer=self.creator
         )
         fee_liability = self.staking.get_token_liability(token_contract="con_fee_token")
-        penalty_liability = self.staking.get_token_liability(
-            token_contract="con_stake_token"
-        )
+        penalty_liability = self.staking.get_token_liability(token_contract="con_stake_token")
         self.assertEqual(fee_liability["creator"], 10.0)
         self.assertEqual(penalty_liability["creator"], 7.5)
 
@@ -1143,9 +1141,7 @@ def approve(amount: float, to: str):
         self.assertAlmostEqual(
             float(rewards["current_reward"]), self.annualized_reward(), places=12
         )
-        self.assertAlmostEqual(
-            float(rewards["max_reward"]), self.annualized_reward(), places=12
-        )
+        self.assertAlmostEqual(float(rewards["max_reward"]), self.annualized_reward(), places=12)
         self.assertEqual(rewards["potential_penalty"], 0.0)
         self.assertEqual(rewards["is_early"], False)
 
@@ -1184,9 +1180,7 @@ def approve(amount: float, to: str):
         self.assertAlmostEqual(
             float(rewards["current_reward"]), self.annualized_reward() * 0.5, places=12
         )
-        self.assertAlmostEqual(
-            float(rewards["max_reward"]), self.annualized_reward(), places=12
-        )
+        self.assertAlmostEqual(float(rewards["max_reward"]), self.annualized_reward(), places=12)
         self.assertEqual(rewards["potential_penalty"], 5.0)  # 50% time remaining * 10% penalty
         self.assertEqual(rewards["is_early"], True)
 
@@ -1248,12 +1242,8 @@ def approve(amount: float, to: str):
             environment={"now": self.test_time},
         )
 
-        stake_liability = self.staking.get_token_liability(
-            token_contract="con_stake_token"
-        )
-        reward_liability = self.staking.get_token_liability(
-            token_contract="con_reward_token"
-        )
+        stake_liability = self.staking.get_token_liability(token_contract="con_stake_token")
+        reward_liability = self.staking.get_token_liability(token_contract="con_reward_token")
         self.assertEqual(stake_liability["principal"], 100.0)
         self.assertEqual(stake_liability["total"], 100.0)
         self.assertEqual(reward_liability["rewards"], 1000.0)
