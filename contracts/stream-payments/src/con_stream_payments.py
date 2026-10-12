@@ -17,7 +17,6 @@ DEPOSIT_KEY = "deposit"
 NONCE_KEY = "nonce"
 
 streams = Hash()
-permits = Hash()
 sender_nonces = Hash(default_value=0)
 
 TOKEN_INTERFACE = [
@@ -288,21 +287,6 @@ def payout_claimable_amount(stream_id: str):
     return amount
 
 
-def construct_stream_permit_msg(
-    sender: str,
-    receiver: str,
-    token_contract: str,
-    rate,
-    begins,
-    closes,
-    deadline,
-):
-    return (
-        f"{sender}:{receiver}:{token_contract}:{to_decimal(rate)}:"
-        f"{begins}:{closes}:{deadline}:{ctx.this}:{chain_id}"
-    )
-
-
 @construct
 def seed():
     pass
@@ -323,49 +307,6 @@ def create_stream(
         rate=rate,
         begins=parse_time(begins),
         closes=parse_time(closes),
-    )
-
-
-@export
-def create_stream_from_permit(
-    sender: str,
-    token_contract: str,
-    receiver: str,
-    rate: float,
-    begins: str,
-    closes: str,
-    deadline: str,
-    signature: str,
-):
-    begins_time = parse_time(begins)
-    closes_time = parse_time(closes)
-    deadline_time = parse_time(deadline)
-
-    assert now < deadline_time, "Permit has expired."
-
-    permit_msg = construct_stream_permit_msg(
-        sender=sender,
-        receiver=receiver,
-        token_contract=token_contract,
-        rate=rate,
-        begins=begins_time,
-        closes=closes_time,
-        deadline=deadline_time,
-    )
-    permit_hash = hashlib.sha3_text(permit_msg)
-
-    assert permits[permit_hash] is None, "Permit can only be used once."
-    assert crypto.verify(sender, permit_msg, signature), "Invalid signature."
-
-    permits[permit_hash] = True
-
-    return perform_create_stream(
-        sender=sender,
-        receiver=receiver,
-        token_contract=token_contract,
-        rate=rate,
-        begins=begins_time,
-        closes=closes_time,
     )
 
 

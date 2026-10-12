@@ -96,23 +96,22 @@ flowchart LR
 
 ## Dependencies
 
-- `zk_registry` system contract from `xian-contracting`
+- `zk_registry` system contract from `xian-configs`
 - contract-side `zk` stdlib bridge
 - real proving circuits, dev proving bundles, and note helpers from `xian-zk`
 
 ## Caveats
 
-- Candidate status means proof-backed flows are implemented, with product and
-  launch hardening remaining before broad end-user use.
+- Proof-backed flows depend on the selected circuits, setup integrity and
+  registry authority; candidate status is not an audit certification.
 - Tree depth is fixed per circuit family, so larger capacities require a
   verifying-key / circuit upgrade rather than a live toggle.
 - The package includes a wallet-side proving and note-scanning path through
   `xian-zk`: state snapshots, record sync, note selection, exact-withdraw
   planning, separated viewing keys, and a basic disclosed-viewer path.
 - Operator-side support includes bundle metadata and registry-manifest
-  generation. Remaining productization gaps include an MPC ceremony flow, a
-  polished end-user wallet interface, and a broader network-level
-  viewing/disclosure policy.
+  generation. Value-bearing deployments require reviewed ceremony-derived
+  proving artifacts; development setup material is test-only.
 
 ## Validation
 

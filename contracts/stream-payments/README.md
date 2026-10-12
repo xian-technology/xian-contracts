@@ -21,7 +21,7 @@ token contract. Each stream:
 - lets the sender or receiver claim accrued value over time
 - allows the sender to shorten a stream and receive the unvested refund
 - allows the receiver to forfeit the future part of a stream
-- supports signer-authorized `create_stream_from_permit(...)` relays
+- binds stream creation to the authenticated transaction caller
 
 ## Implementation Model
 
@@ -56,9 +56,6 @@ The contract validates that interface before using the token.
 
 - `change_close_time(...)` only supports shortening or immediate close. It does
   not support extending a stream in place.
-- `create_stream_from_permit(...)` authorizes the stream parameters, but the
-  sender must approve `con_stream_payments` on the token
-  contract for the escrow transfer to succeed.
 
 ## Validation
 
@@ -69,4 +66,12 @@ This package is covered by:
 
 The test suite covers escrow funding, accrual, shortening/refunds, forfeit,
 multi-day elapsed-time calculation, duplicate schedules via sender nonce, and
-permit-based creation.
+rejection of unsupported permit entrypoints.
+
+### Account authorization
+
+Use direct `create_stream` transactions after a direct token approval. Stream
+creation binds the sender to `ctx.caller`; there is no permit or relay signature
+entrypoint. The node verifies the caller's current account policy, including
+hybrid keys for enrolled accounts. Recovery retains the address and therefore
+stream ownership.

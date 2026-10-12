@@ -210,42 +210,19 @@ class TestStreamPayments(unittest.TestCase):
             "forfeited",
         )
 
-    def test_create_stream_from_permit_supports_relayer(self):
-        begins = ts(2026, 1, 1, 0, 0, 0)
-        closes = ts(2026, 1, 1, 0, 0, 10)
-        self.token.approve(
-            amount=20,
-            to="con_stream_payments",
-            signer=self.alice,
-        )
-
-        permit_message = (
-            f"{self.alice}:{self.bob}:con_token:2:{begins}:{closes}:"
-            f"{ts(2026, 1, 1, 1, 0, 0)}:con_stream_payments:local"
-        )
-        signature = self.alice_account.sign_message(permit_message)
-
-        stream_id = self.streams.create_stream_from_permit(
-            sender=self.alice,
-            token_contract="con_token",
-            receiver=self.bob,
-            rate=2,
-            begins=begins,
-            closes=closes,
-            deadline=ts(2026, 1, 1, 1, 0, 0),
-            signature=signature,
-            signer=self.relayer,
-            environment={
-                "now": Datetime(2026, 1, 1, 0, 0, 0),
-                "chain_id": "local",
-            },
-        )
-
-        self.assertEqual(
-            self.streams.stream_info(stream_id=stream_id)["sender"],
-            self.alice,
-        )
-        self.assertEqual(self.token.balance_of(address="con_stream_payments"), 20)
+    def test_relayer_cannot_create_stream_for_another_account(self):
+        self.token.approve(amount=20, to="con_stream_payments", signer=self.alice)
+        before = self.token.balance_of(address=self.alice)
+        with self.assertRaises(Exception):
+            self.streams.create_stream_from_permit(
+                sender=self.alice, token_contract="con_token", receiver=self.bob,
+                rate=2, begins=ts(2026, 1, 1), closes=ts(2026, 1, 1, 0, 0, 10),
+                deadline=ts(2026, 1, 2), signature="00" * 64, signer=self.relayer,
+            )
+        self.assertEqual(self.token.balance_of(address=self.alice), before)
+        self.assertEqual(self.token.balance_of(address="con_stream_payments"), 0)
+        stream_id = self.create_stream(begins=ts(2026, 1, 1), closes=ts(2026, 1, 1, 0, 0, 10), rate=2)
+        self.assertEqual(self.streams.stream_info(stream_id=stream_id)["sender"], self.alice)
 
     def test_duplicate_schedule_parameters_get_unique_stream_ids(self):
         begins = ts(2026, 1, 1, 0, 0, 0)
