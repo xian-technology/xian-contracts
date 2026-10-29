@@ -14,8 +14,7 @@ draws.
 
 ## Notes
 
-- This package is closer to the Gamma Phi idea than the simple lottery
-  example because entry weight is explicit and paid for.
+- Entry weight is explicit and purchased with the configured token.
 - Draws use a deterministic entropy accumulator that incorporates buyer
   contributions and exposes audit fields, but this is not suitable for
   adversarial high-value use without stronger randomness design.

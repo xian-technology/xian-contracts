@@ -16,14 +16,13 @@ coordination.
 
 - This package is intentionally generic. It does not encode chess, checkers, or
   go rules directly.
-- It captures the reusable part of the Gamma Phi idea: a shared match manager
-  with explicit participants, turn order, move references, and accepted
-  results.
+- The shared match manager records explicit participants, turn order, move
+  references and accepted results.
 - The current scaffold also covers invited-opponent decline, participant
   resignation, and per-move reads so clients do not need to reconstruct those
   flows off-chain.
-- Game-specific validation can later be layered on top by app logic or by
-  tighter package variants.
+- Game-specific move validation belongs to the integrating application; the
+  contract manages match lifecycle and participant agreement.
 - Move payloads are stored as references or compact strings, not full rich game
   state objects.
 

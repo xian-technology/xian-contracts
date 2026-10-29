@@ -1,14 +1,5 @@
-# Tests
+# Validation
 
-This package does not have automated tests yet.
-
-Current validation comes from the repo-wide lint and compile checks in
-`scripts/validate_contracts.py`.
-
-If this package is promoted beyond `experimental`, add at least one end-to-end
-smoke test covering:
-
-- funding the lottery
-- registering participants
-- closing the lottery
-- verifying payout behavior
+This experimental package has no package-local automated test suite.
+The repository's `scripts/validate_contracts.py` checks lint and compilation;
+those checks do not establish payout correctness.
