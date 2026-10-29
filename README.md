@@ -39,6 +39,8 @@ uv run pytest -m slow
 
 The default `pytest` path excludes the slow proof-generation tests. Run
 `pytest -m slow` explicitly for the heavy shielded-note proving flows.
+The repository's `conftest.py` directs default contract clients to disposable
+test storage before collection; tests do not use the host node's state directory.
 
 ## Principles
 
