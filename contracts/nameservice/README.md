@@ -15,6 +15,8 @@ data.
 ## Notes
 
 - Names are normalized to lowercase before validation and blacklist checks.
+- Re-registering an expired name clears its previous owner's primary-name
+  association. The new owner must explicitly select it as their primary name.
 - The manager controls pricing, registration period, contract allowlist, and
   whether the registry is enabled.
 - Contract callers whose names start with `con_` must be explicitly allowlisted

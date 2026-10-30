@@ -76,6 +76,18 @@ class TestNameservice(unittest.TestCase):
                 environment={"now": Datetime(2026, 1, 1)},
             )
 
+    def test_expired_name_re_registration_clears_previous_primary_mapping(self):
+        first = {"now": Datetime(2026, 1, 1)}
+        later = {"now": Datetime(2027, 1, 2)}
+        bob = "b" * 64
+        self.currency.transfer(amount=100, to=bob, signer=self.manager)
+        self.nameservice.mint_name(name="alice123", signer=self.alice, environment=first)
+        self.nameservice.set_main_name_to_caller(name="alice123", signer=self.alice, environment=first)
+        self.nameservice.mint_name(name="alice123", signer=bob, environment=later)
+        self.assertEqual(self.nameservice.get_owner(name="alice123", environment=later), bob)
+        self.assertIsNone(self.nameservice.get_main_name_to_address(name="alice123", environment=later))
+        self.assertIsNone(self.nameservice.get_address_to_main_name(address=self.alice, environment=later))
+
 
 if __name__ == "__main__":
     unittest.main()

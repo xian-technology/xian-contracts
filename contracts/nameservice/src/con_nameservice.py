@@ -81,6 +81,9 @@ def mint_name(name: str):
     if owners[name]:
         assert is_expired(name), "Name already exists and has not expired yet."
         balances[owners[name], name] = 0
+        if address_to_main_name[owners[name]] == name:
+            address_to_main_name[owners[name]] = None
+        main_name_to_address[name] = None
 
     currency.transfer_from(amount=mint_price.get(), to=manager.get(), main_account=ctx.caller)
 
