@@ -3,7 +3,7 @@
   "schema_version": 1,
   "name": "nameservice",
   "display_name": "Nameservice",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Renewable on-chain name registry with primary-name mapping and arbitrary record data.",
   "source": {
     "repo": "https://github.com/xian-technology/xian-contracts"
@@ -13,7 +13,7 @@
       "name": "con_nameservice",
       "role": "registry",
       "path": "src/con_nameservice.py",
-      "sha256": "25334740a92e3b3688749499c4779d4b7bb84ae12c5464716336117c2bc16bdc",
+      "sha256": "95e2816e40ec675c5814b3563d40b22ec87797f33b5bf09824d9a83867cf1213",
       "deploy_order": 10
     }
   ]

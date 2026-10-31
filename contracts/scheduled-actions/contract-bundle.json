@@ -3,7 +3,7 @@
   "schema_version": 1,
   "name": "scheduled-actions",
   "display_name": "Scheduled Actions",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Allowlisted delayed-call scheduler for contracts that want time-gated execution.",
   "source": {
     "repo": "https://github.com/xian-technology/xian-contracts"
@@ -13,7 +13,7 @@
       "name": "con_scheduled_actions",
       "role": "scheduler",
       "path": "src/con_scheduled_actions.py",
-      "sha256": "3f6425a1ffb2e2e4458c1116f061cd555d29dbe63e1be4744d84106622c7b084",
+      "sha256": "d57c267f10bde995c640f6be50b159d668d6ee0b23f6fe8d2599099eeee2e28f",
       "deploy_order": 10
     }
   ]

@@ -26,3 +26,9 @@ data.
 
 - repo-wide lint and compile checks
 - package-local smoke tests in `tests/test_nameservice.py`
+
+Approvals authorize delivery to a particular recipient. Any permitted caller can
+perform that delivery; an approval does not authorize a different recipient.
+Every transfer or new registration invalidates all prior approvals for the name,
+even when ownership later returns to the same address. Renewing an unexpired
+registration preserves approvals.

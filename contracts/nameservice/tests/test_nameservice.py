@@ -4,7 +4,7 @@ from pathlib import Path
 from contracting.local import ContractingClient
 from xian_runtime_types.time import Datetime
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).absolute().parents[1]
 CONTRACT_PATH = ROOT / "src" / "con_nameservice.py"
 
 TOKEN_CODE = """
@@ -82,11 +82,47 @@ class TestNameservice(unittest.TestCase):
         bob = "b" * 64
         self.currency.transfer(amount=100, to=bob, signer=self.manager)
         self.nameservice.mint_name(name="alice123", signer=self.alice, environment=first)
-        self.nameservice.set_main_name_to_caller(name="alice123", signer=self.alice, environment=first)
+        self.nameservice.set_main_name_to_caller(
+            name="alice123", signer=self.alice, environment=first
+        )
         self.nameservice.mint_name(name="alice123", signer=bob, environment=later)
         self.assertEqual(self.nameservice.get_owner(name="alice123", environment=later), bob)
-        self.assertIsNone(self.nameservice.get_main_name_to_address(name="alice123", environment=later))
-        self.assertIsNone(self.nameservice.get_address_to_main_name(address=self.alice, environment=later))
+        self.assertIsNone(
+            self.nameservice.get_main_name_to_address(name="alice123", environment=later)
+        )
+        self.assertIsNone(
+            self.nameservice.get_address_to_main_name(address=self.alice, environment=later)
+        )
+
+    def test_old_recipient_approval_does_not_revive_after_ownership_cycle(self):
+        env = {"now": Datetime(2026, 1, 1)}
+        bob, carol = "b" * 64, "c" * 64
+        self.nameservice.mint_name(name="alice123", signer=self.alice, environment=env)
+        self.nameservice.approve(name="alice123", to=carol, signer=self.alice, environment=env)
+        self.nameservice.transfer(name="alice123", to=bob, signer=self.alice, environment=env)
+        self.nameservice.transfer(name="alice123", to=self.alice, signer=bob, environment=env)
+        with self.assertRaisesRegex(AssertionError, "not approved"):
+            self.nameservice.transfer_from(
+                name="alice123", to=carol, main_account=self.alice, signer=carol, environment=env
+            )
+        self.nameservice.approve(name="alice123", to=carol, signer=self.alice, environment=env)
+        # Approval authorizes delivery to the recipient, including by a third party.
+        self.nameservice.transfer_from(
+            name="alice123", to=carol, main_account=self.alice, signer=bob, environment=env
+        )
+        self.assertEqual(self.nameservice.get_owner(name="alice123", environment=env), carol)
+
+    def test_expired_registration_invalidates_approval_even_for_same_owner(self):
+        first = {"now": Datetime(2026, 1, 1)}
+        later = {"now": Datetime(2027, 1, 2)}
+        bob = "b" * 64
+        self.nameservice.mint_name(name="alice123", signer=self.alice, environment=first)
+        self.nameservice.approve(name="alice123", to=bob, signer=self.alice, environment=first)
+        self.nameservice.mint_name(name="alice123", signer=self.alice, environment=later)
+        with self.assertRaisesRegex(AssertionError, "not approved"):
+            self.nameservice.transfer_from(
+                name="alice123", to=bob, main_account=self.alice, signer=bob, environment=later
+            )
 
 
 if __name__ == "__main__":

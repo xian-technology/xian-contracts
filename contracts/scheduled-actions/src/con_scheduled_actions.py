@@ -107,24 +107,43 @@ def normalize_payload(payload: dict):
     return payload
 
 
-def canonicalize(value: Any):
+def framed(tag: str, text: str):
+    return tag + str(len(text)) + ":" + text
+
+
+def canonicalize_scalar(value: Any):
     if value is None:
-        return "null"
+        return "n0:"
+    # Test bool before int; their values compare equal but are distinct payloads.
+    for kind, tag in [(bool, "b"), (int, "i"), (str, "s"),
+                      (decimal, "d"), (float, "f"),
+                      (datetime.datetime, "t"), (datetime.timedelta, "u")]:
+        if isinstance(value, kind):
+            return framed(tag, str(value))
+    if isinstance(value, bytes):
+        return framed("x", value.hex())
+    if isinstance(value, bytearray):
+        return framed("y", value.hex())
+    assert False, "Unsupported payload value."
+
+
+def canonicalize(value: Any):
     if isinstance(value, dict):
         items = []
         for key in sorted(value.keys()):
-            items.append(str(key) + ":" + canonicalize(value[key]))
-        return "{" + ",".join(items) + "}"
-    if isinstance(value, list):
-        items = []
-        for item in value:
-            items.append(canonicalize(item))
-        return "[" + ",".join(items) + "]"
-    return str(value)
+            assert isinstance(key, str), "Payload dictionary keys must be strings."
+            items.append(framed("s", key) + canonicalize(value[key]))
+        return framed("m", "".join(items))
+    if isinstance(value, (list, tuple)):
+        return framed("l", "".join([canonicalize(item) for item in value]))
+    if isinstance(value, (set, frozenset)):
+        tag = "e" if isinstance(value, set) else "r"
+        return framed(tag, "".join(sorted([canonicalize(item) for item in value])))
+    return canonicalize_scalar(value)
 
 
 def payload_digest(payload: dict):
-    return hashlib.sha3_text(canonicalize(normalize_payload(payload)))
+    return hashlib.sha3_text("scheduled-actions:v2:" + canonicalize(normalize_payload(payload)))
 
 
 def require_target_contract(target_contract: str):
@@ -201,6 +220,7 @@ def schedule_action(
     actions[action_id, "expires_at"] = expires_at
     actions[action_id, "payload"] = payload
     actions[action_id, "payload_hash"] = payload_digest(payload)
+    actions[action_id, "payload_hash_version"] = 2
     actions[action_id, "memo"] = memo
     actions[action_id, "created_at"] = now
     actions[action_id, "updated_at"] = now
@@ -324,6 +344,7 @@ def get_action(action_id: int):
         else "",
         "payload": actions[action_id, "payload"],
         "payload_hash": actions[action_id, "payload_hash"],
+        "payload_hash_version": actions[action_id, "payload_hash_version"] or 1,
         "memo": actions[action_id, "memo"],
         "created_at": str(actions[action_id, "created_at"]),
         "updated_at": str(actions[action_id, "updated_at"]),

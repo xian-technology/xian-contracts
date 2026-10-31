@@ -4,6 +4,8 @@ manager = Variable()
 names = Hash(default_value=False)
 balances = Hash(default_value=0)
 approvals = Hash(default_value=0)
+ownership_generation = Hash(default_value=0)
+approval_generation = Hash(default_value=0)
 expiry_times = Hash(default_value=None)
 owners = Hash(default_value=None)
 
@@ -45,6 +47,7 @@ def assert_if_contract_is_approved(contract: str):
 
 def assert_is_approved_for_transfer(main_account: str, to: str, name: str):
     assert approvals[main_account, to, name] == 1, "Name is not approved for transfer"
+    assert approval_generation[main_account, to, name] == ownership_generation[name], "Name is not approved for transfer"
 
 
 def assert_is_not_blacklisted(name: str):
@@ -91,6 +94,7 @@ def mint_name(name: str):
     expiry_times[name] = now + datetime.timedelta(days=registration_period.get())
     balances[ctx.caller, name] = 1
     owners[name] = ctx.caller
+    ownership_generation[name] += 1
 
 
 @export
@@ -107,6 +111,7 @@ def transfer(name: str, to: str):
     if get_address_to_main_name(ctx.caller) == name:
         address_to_main_name[ctx.caller] = None
     owners[name] = to
+    ownership_generation[name] += 1
     approvals[ctx.caller, to, name] = 0
 
 
@@ -115,6 +120,7 @@ def approve(name: str, to: str):
     assert_is_not_expired(name)
     assert_is_owner(ctx.caller, name)
     approvals[ctx.caller, to, name] = 1
+    approval_generation[ctx.caller, to, name] = ownership_generation[name]
 
 
 @export
@@ -141,6 +147,7 @@ def transfer_from(name: str, to: str, main_account: str):
     if get_address_to_main_name(main_account) == name:
         address_to_main_name[main_account] = None
     owners[name] = to
+    ownership_generation[name] += 1
 
 
 @export
