@@ -1,11 +1,11 @@
-import inspect
 from pathlib import Path
 
+from contracting import constants
 from contracting.local import ContractingClient
 
 
 def test_default_contract_client_cannot_flush_host_storage():
-    storage_home = inspect.signature(ContractingClient).parameters["storage_home"].default
+    storage_home = constants.STORAGE_HOME
     # Check before construction: this regression must be safe without conftest.
     assert storage_home != Path.home() / ".cometbft" / "xian"
     with ContractingClient() as client:

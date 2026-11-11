@@ -36,7 +36,7 @@ def balance_of(address: str):
 
 class TestNameservice(unittest.TestCase):
     def setUp(self):
-        self.client = ContractingClient(vm_profile="xian_vm_v2")
+        self.client = ContractingClient()
         self.client.flush()
 
         self.client.submit(TOKEN_CODE, name="currency")

@@ -10,7 +10,7 @@ CONTRACT_PATH = ROOT / "src" / "con_turn_based_games.py"
 
 class TestTurnBasedGames(unittest.TestCase):
     def setUp(self):
-        self.client = ContractingClient(vm_profile="xian_vm_v2")
+        self.client = ContractingClient()
         self.client.flush()
 
         with CONTRACT_PATH.open() as f:

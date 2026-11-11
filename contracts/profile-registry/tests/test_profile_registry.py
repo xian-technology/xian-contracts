@@ -10,7 +10,7 @@ CONTRACT_PATH = ROOT / "src" / "con_profile_registry.py"
 
 class TestProfileRegistry(unittest.TestCase):
     def setUp(self):
-        self.client = ContractingClient(vm_profile="xian_vm_v2")
+        self.client = ContractingClient()
         self.client.flush()
 
         with CONTRACT_PATH.open() as f:

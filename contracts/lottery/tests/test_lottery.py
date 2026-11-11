@@ -7,7 +7,7 @@ CONTRACTS = Path(__file__).resolve().parents[2]
 
 
 def test_fractional_prize_reaches_only_registered_player(tmp_path):
-    with ContractingClient(storage_home=tmp_path, vm_profile="xian_vm_v2") as client:
+    with ContractingClient(storage_home=tmp_path) as client:
         for package, name in (
             ("reflection-token", "con_reflection_token"),
             ("lottery", "con_lottery"),

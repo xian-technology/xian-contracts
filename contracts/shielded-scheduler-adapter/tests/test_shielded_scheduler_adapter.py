@@ -56,7 +56,7 @@ class TestShieldedSchedulerAdapter(unittest.TestCase):
         cls.auth_manifest = shielded_scheduler_auth_registry_manifest(cls.auth_prover)
 
     def setUp(self):
-        self.client = ContractingClient(vm_profile="xian_vm_v2")
+        self.client = ContractingClient()
         self.client.flush()
 
         with ZK_REGISTRY_PATH.open() as registry_file:

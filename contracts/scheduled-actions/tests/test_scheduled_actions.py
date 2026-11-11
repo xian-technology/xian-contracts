@@ -40,7 +40,7 @@ def info():
 
 class TestScheduledActions(unittest.TestCase):
     def setUp(self):
-        self.client = ContractingClient(vm_profile="xian_vm_v2")
+        self.client = ContractingClient()
         self.client.flush()
 
         self.client.submit(TARGET_CODE, name="con_scheduled_target")

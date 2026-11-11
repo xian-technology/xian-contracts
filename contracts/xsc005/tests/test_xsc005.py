@@ -73,7 +73,7 @@ def owner_of(token_id: str):
 
 class TestXSC005(unittest.TestCase):
     def setUp(self):
-        self.client = ContractingClient(vm_profile="xian_vm_v2")
+        self.client = ContractingClient()
         self.client.flush()
 
         self.client.submit(PAYMENT_TOKEN, name="currency")

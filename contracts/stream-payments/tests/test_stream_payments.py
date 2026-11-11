@@ -59,7 +59,7 @@ def diff_seconds(start: str, end: str):
 
 class TestStreamPayments(unittest.TestCase):
     def setUp(self):
-        self.client = ContractingClient(vm_profile="xian_vm_v2")
+        self.client = ContractingClient()
         self.client.flush()
 
         self.alice_account = Ed25519Account.generate()
