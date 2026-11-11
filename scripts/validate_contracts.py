@@ -5,8 +5,8 @@ import json
 import sys
 from pathlib import Path
 
-from contracting.compilation.compiler import ContractingCompiler
-from xian_linter import lint_code_inline
+from contracting.artifacts import build_contract_artifacts, validate_contract_artifacts
+from xian_linter import XIAN_VM_V2_MODE, lint_code_inline
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACTS_ROOT = ROOT / "contracts"
@@ -130,7 +130,7 @@ def validate_manifest(package: Path, contract_files: list[Path]) -> None:
 
 def validate_contract_source(path: Path) -> None:
     code = path.read_text()
-    errors = lint_code_inline(code)
+    errors = lint_code_inline(code, mode=XIAN_VM_V2_MODE)
     if errors:
         print(f"{path.relative_to(ROOT)}")
         for error in errors:
@@ -141,8 +141,12 @@ def validate_contract_source(path: Path) -> None:
             )
         raise SystemExit(1)
 
-    compiler = ContractingCompiler(module_name=path.stem)
-    compiler.parse_to_code(code)
+    artifact = build_contract_artifacts(
+        module_name=path.stem, source=code, vm_profile=XIAN_VM_V2_MODE
+    )
+    validate_contract_artifacts(
+        module_name=path.stem, artifacts=artifact, input_source=code, vm_profile=XIAN_VM_V2_MODE
+    )
 
 
 def main() -> None:

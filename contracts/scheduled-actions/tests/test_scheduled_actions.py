@@ -1,7 +1,9 @@
+import hashlib
 import unittest
 from pathlib import Path
 
 from contracting.local import ContractingClient
+from xian_runtime_types.decimal import ContractingDecimal
 from xian_runtime_types.time import Datetime
 
 ROOT = Path(__file__).absolute().parents[1]
@@ -38,7 +40,7 @@ def info():
 
 class TestScheduledActions(unittest.TestCase):
     def setUp(self):
-        self.client = ContractingClient()
+        self.client = ContractingClient(vm_profile="xian_vm_v2")
         self.client.flush()
 
         self.client.submit(TARGET_CODE, name="con_scheduled_target")
@@ -87,7 +89,16 @@ class TestScheduledActions(unittest.TestCase):
         ]
         actions = [self.schedule_payload(payload) for payload in payloads]
         self.assertEqual(len({action["payload_hash"] for action in actions}), len(payloads))
-        self.assertTrue(all(action["payload_hash_version"] == 2 for action in actions))
+        self.assertTrue(all(action["payload_hash_version"] == 3 for action in actions))
+
+    def test_fixed_decimal_payload_commitment(self):
+        # Independent client encoding for {"amount": decimal("1.25")}.
+        message = b"scheduled-actions:v3:m16:s6:amountd4:1.25"
+        expected = hashlib.sha3_256(message).hexdigest()
+        for price in ("1.25", "1.250"):
+            action = self.schedule_payload({"amount": ContractingDecimal(price)})
+            self.assertEqual(action["payload_hash"], expected)
+            self.assertEqual(action["payload_hash_version"], 3)
 
     def test_payload_hash_ignores_dictionary_insertion_order(self):
         first = self.schedule_payload({"é": {"z": 1, "a": "[,]"}, "a": [1, None]})

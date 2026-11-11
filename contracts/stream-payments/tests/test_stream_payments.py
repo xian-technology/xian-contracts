@@ -3,6 +3,7 @@ from pathlib import Path
 
 from contracting.local import ContractingClient
 from xian_accounts import Ed25519Account
+from xian_runtime_types.decimal import ContractingDecimal
 from xian_runtime_types.time import Datetime
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -18,30 +19,27 @@ def seed():
 
 
 @export
-def transfer(amount: float, to: str):
-    amount_value = decimal(str(amount))
-    assert amount_value > 0, "Amount must be positive"
-    assert balances[ctx.caller] >= amount_value, "Insufficient balance"
-    balances[ctx.caller] -= amount_value
-    balances[to] += amount_value
+def transfer(amount: decimal, to: str):
+    assert amount > 0, "Amount must be positive"
+    assert balances[ctx.caller] >= amount, "Insufficient balance"
+    balances[ctx.caller] -= amount
+    balances[to] += amount
 
 
 @export
-def approve(amount: float, to: str):
-    amount_value = decimal(str(amount))
-    assert amount_value >= 0, "Amount must be non-negative"
-    balances[ctx.caller, to] = amount_value
+def approve(amount: decimal, to: str):
+    assert amount >= 0, "Amount must be non-negative"
+    balances[ctx.caller, to] = amount
 
 
 @export
-def transfer_from(amount: float, to: str, main_account: str):
-    amount_value = decimal(str(amount))
-    assert amount_value > 0, "Amount must be positive"
-    assert balances[main_account, ctx.caller] >= amount_value, "Insufficient allowance"
-    assert balances[main_account] >= amount_value, "Insufficient balance"
-    balances[main_account, ctx.caller] -= amount_value
-    balances[main_account] -= amount_value
-    balances[to] += amount_value
+def transfer_from(amount: decimal, to: str, main_account: str):
+    assert amount > 0, "Amount must be positive"
+    assert balances[main_account, ctx.caller] >= amount, "Insufficient allowance"
+    assert balances[main_account] >= amount, "Insufficient balance"
+    balances[main_account, ctx.caller] -= amount
+    balances[main_account] -= amount
+    balances[to] += amount
 
 
 @export
@@ -56,12 +54,12 @@ def ts(year, month, day, hour=0, minute=0, second=0):
 
 def diff_seconds(start: str, end: str):
     delta = parse_dt(end) - parse_dt(start)
-    return delta.days * 86400 + delta.seconds
+    return delta.seconds
 
 
 class TestStreamPayments(unittest.TestCase):
     def setUp(self):
-        self.client = ContractingClient()
+        self.client = ContractingClient(vm_profile="xian_vm_v2")
         self.client.flush()
 
         self.alice_account = Ed25519Account.generate()
@@ -83,7 +81,7 @@ class TestStreamPayments(unittest.TestCase):
 
     def create_stream(self, *, begins, closes, rate, signer=None):
         total_seconds = diff_seconds(begins, closes)
-        total_amount = float(rate) * total_seconds
+        total_amount = ContractingDecimal(rate) * total_seconds
         signer = signer or self.alice
         self.token.approve(
             amount=total_amount,
@@ -214,13 +212,13 @@ class TestStreamPayments(unittest.TestCase):
         begins = ts(2026, 1, 1, 0, 0, 0)
         closes = ts(2026, 1, 1, 0, 0, 10)
         self.token.approve(
-            amount=20,
+            amount=ContractingDecimal("2.5"),
             to="con_stream_payments",
             signer=self.alice,
         )
 
         permit_message = (
-            f"{self.alice}:{self.bob}:con_token:2:{begins}:{closes}:"
+            f"{self.alice}:{self.bob}:con_token:0.25:{begins}:{closes}:"
             f"{ts(2026, 1, 1, 1, 0, 0)}:con_stream_payments:local"
         )
         signature = self.alice_account.sign_message(permit_message)
@@ -229,7 +227,7 @@ class TestStreamPayments(unittest.TestCase):
             sender=self.alice,
             token_contract="con_token",
             receiver=self.bob,
-            rate=2,
+            rate=ContractingDecimal("0.250"),
             begins=begins,
             closes=closes,
             deadline=ts(2026, 1, 1, 1, 0, 0),
@@ -245,7 +243,9 @@ class TestStreamPayments(unittest.TestCase):
             self.streams.stream_info(stream_id=stream_id)["sender"],
             self.alice,
         )
-        self.assertEqual(self.token.balance_of(address="con_stream_payments"), 20)
+        self.assertEqual(
+            self.token.balance_of(address="con_stream_payments"), ContractingDecimal("2.5")
+        )
 
     def test_duplicate_schedule_parameters_get_unique_stream_ids(self):
         begins = ts(2026, 1, 1, 0, 0, 0)

@@ -110,7 +110,7 @@ TokenListedEvent = LogEvent(
         "token_id": {"type": str, "idx": True},
         "seller": {"type": str, "idx": True},
         "currency_contract": {"type": str, "idx": True},
-        "price": {"type": (int, float, decimal)},
+        "price": {"type": (int, decimal)},
         "reserved_for": {"type": str},
     },
 )
@@ -122,8 +122,8 @@ TokenSaleEvent = LogEvent(
         "seller": {"type": str, "idx": True},
         "buyer": {"type": str, "idx": True},
         "currency_contract": {"type": str},
-        "price": {"type": (int, float, decimal)},
-        "royalty_amount": {"type": (int, float, decimal)},
+        "price": {"type": (int, decimal)},
+        "royalty_amount": {"type": (int, decimal)},
     },
 )
 
@@ -206,9 +206,7 @@ def normalize_text(value: str, label: str, max_length: int):
 def to_decimal(value):
     if value is None or value == "":
         return ZERO
-    if isinstance(value, str):
-        return decimal(value)
-    return decimal(str(value))
+    return decimal(value)
 
 
 def require_operator():
@@ -484,7 +482,8 @@ def royalty_amount_for(token_id: str, sale_price):
     bps = to_decimal(token_data[token_id, "royalty_bps"])
     if bps <= ZERO:
         return ZERO
-    return sale_price * bps / TEN_THOUSAND
+    # Integer basis points form an exact rate; the payout rounds once.
+    return sale_price * (bps / TEN_THOUSAND)
 
 
 @export
@@ -922,7 +921,7 @@ def payment_token_contract():
 def list_for_sale(
     token_id: str,
     currency_contract: str,
-    price: float,
+    price: decimal,
     reserved_for: str = "",
 ):
     owner = require_token(token_id)
@@ -1015,7 +1014,7 @@ def buy(token_id: str):
 
 
 @export
-def royalty_info(token_id: str, sale_price: float):
+def royalty_info(token_id: str, sale_price: decimal):
     require_token(token_id)
     price = to_decimal(sale_price)
     amount = royalty_amount_for(token_id, price)

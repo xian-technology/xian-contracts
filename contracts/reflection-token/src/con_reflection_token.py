@@ -24,10 +24,10 @@ TransferEvent = LogEvent(
     {
         'from': {'type': str, 'idx': True},
         'to': {'type': str, 'idx': True},
-        'amount': {'type': (int, float, decimal)},
-        'transfer_amount': {'type': (int, float, decimal)},
-        'burn_amount': {'type': (int, float, decimal)},
-        'reflection_amount': {'type': (int, float, decimal)},
+        'amount': {'type': (int, decimal)},
+        'transfer_amount': {'type': (int, decimal)},
+        'burn_amount': {'type': (int, decimal)},
+        'reflection_amount': {'type': (int, decimal)},
         'fee_applied': {'type': bool},
     },
 )
@@ -37,7 +37,7 @@ ApproveEvent = LogEvent(
     {
         'owner': {'type': str, 'idx': True},
         'spender': {'type': str, 'idx': True},
-        'amount': {'type': (int, float, decimal)},
+        'amount': {'type': (int, decimal)},
     },
 )
 
@@ -46,7 +46,7 @@ RewardStatusChangedEvent = LogEvent(
     {
         'address': {'type': str, 'idx': True},
         'excluded': {'type': bool},
-        'balance': {'type': (int, float, decimal)},
+        'balance': {'type': (int, decimal)},
     },
 )
 
@@ -62,9 +62,7 @@ FeeTargetChangedEvent = LogEvent(
 def to_decimal(value):
     if value is None:
         return ZERO
-    if isinstance(value, str):
-        return decimal(value)
-    return decimal(str(value))
+    return decimal(value)
 
 
 def base_rate():
@@ -297,7 +295,7 @@ def get_metadata():
 
 
 @export
-def transfer(amount: float, to: str):
+def transfer(amount: decimal, to: str):
     require_address("to", to)
     charge_fees = fee_targets[ctx.caller] or fee_targets[to]
     move_tokens(ctx.caller, to, amount, charge_fees)
@@ -305,7 +303,7 @@ def transfer(amount: float, to: str):
 
 
 @export
-def approve(amount: float, to: str):
+def approve(amount: decimal, to: str):
     amount_value = to_decimal(amount)
     assert amount_value >= ZERO, 'Cannot approve negative balances!'
     require_address("to", to)
@@ -321,7 +319,7 @@ def approve(amount: float, to: str):
 
 
 @export
-def transfer_from(amount: float, to: str, main_account: str):
+def transfer_from(amount: decimal, to: str, main_account: str):
     amount_value = to_decimal(amount)
     require_address("to", to)
     require_address("main_account", main_account)

@@ -15,14 +15,14 @@ def seed():
     balances[ctx.caller] = 1000000
 
 @export
-def transfer(amount: float, to: str):
+def transfer(amount: decimal, to: str):
     assert amount > 0, 'Amount must be positive'
     assert balances[ctx.caller] >= amount, 'Insufficient balance'
     balances[ctx.caller] -= amount
     balances[to] += amount
 
 @export
-def transfer_from(amount: float, to: str, main_account: str):
+def transfer_from(amount: decimal, to: str, main_account: str):
     assert amount > 0, 'Amount must be positive'
     assert balances[main_account] >= amount, 'Insufficient balance'
     balances[main_account] -= amount
@@ -36,7 +36,7 @@ def balance_of(address: str):
 
 class TestNameservice(unittest.TestCase):
     def setUp(self):
-        self.client = ContractingClient()
+        self.client = ContractingClient(vm_profile="xian_vm_v2")
         self.client.flush()
 
         self.client.submit(TOKEN_CODE, name="currency")

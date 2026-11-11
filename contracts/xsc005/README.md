@@ -62,6 +62,8 @@ NFT surface. The reference marketplace accepts only the seeded chain
 `currency` contract for settlement; arbitrary interface-compatible contracts
 are rejected because interface shape alone cannot prove value transfer.
 
+Listing and sale prices use `decimal`. Multiply a sale price by the exact basis-point rate to compute the royalty. The payout truncates to 30 fractional places, and the seller receives the balance of the price.
+
 ## Validation
 
 Run from `xian-contracts`:

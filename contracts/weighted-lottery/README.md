@@ -21,7 +21,7 @@ draws.
 - Cancelled rounds can move into a refunding state so ticket holders can claim
   their stake back instead of relying on an all-or-nothing pre-sale cancel.
 - Each lottery round is creator-scoped and parameterized by token contract and
-  ticket price.
+  fixed-point decimal ticket price. The pot and refunds multiply this price by the integer ticket count.
 
 ## Validation
 

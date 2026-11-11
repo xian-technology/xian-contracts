@@ -37,6 +37,8 @@ uv run pytest
 uv run pytest -m slow
 ```
 
+The package validator compiles the authored sources for `xian_vm_v2` and validates their artifacts. Package tests execute that profile with the native VM.
+
 The default `pytest` path excludes the slow proof-generation tests. Run
 `pytest -m slow` explicitly for the heavy shielded-note proving flows.
 The repository's `conftest.py` directs default contract clients to disposable

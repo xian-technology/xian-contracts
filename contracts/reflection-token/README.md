@@ -51,6 +51,8 @@ flowchart LR
   Helper["con_dex_helper"] --> Router
 ```
 
+Transfers and allowances accept `decimal` amounts. The reflected balance quotient truncates to 30 fractional places.
+
 ## Validation
 
 - repo-wide lint and compile checks

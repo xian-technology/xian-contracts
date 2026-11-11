@@ -18,30 +18,27 @@ def seed():
 
 
 @export
-def transfer(amount: float, to: str):
-    amount_value = decimal(str(amount))
-    assert amount_value > 0, "Amount must be positive"
-    assert balances[ctx.caller] >= amount_value, "Insufficient balance"
-    balances[ctx.caller] -= amount_value
-    balances[to] += amount_value
+def transfer(amount: decimal, to: str):
+    assert amount > 0, "Amount must be positive"
+    assert balances[ctx.caller] >= amount, "Insufficient balance"
+    balances[ctx.caller] -= amount
+    balances[to] += amount
 
 
 @export
-def approve(amount: float, to: str):
-    amount_value = decimal(str(amount))
-    assert amount_value >= 0, "Amount must be non-negative"
-    allowances[ctx.caller, to] = amount_value
+def approve(amount: decimal, to: str):
+    assert amount >= 0, "Amount must be non-negative"
+    allowances[ctx.caller, to] = amount
 
 
 @export
-def transfer_from(amount: float, to: str, main_account: str):
-    amount_value = decimal(str(amount))
-    assert amount_value > 0, "Amount must be positive"
-    assert allowances[main_account, ctx.caller] >= amount_value, "Insufficient allowance"
-    assert balances[main_account] >= amount_value, "Insufficient balance"
-    allowances[main_account, ctx.caller] -= amount_value
-    balances[main_account] -= amount_value
-    balances[to] += amount_value
+def transfer_from(amount: decimal, to: str, main_account: str):
+    assert amount > 0, "Amount must be positive"
+    assert allowances[main_account, ctx.caller] >= amount, "Insufficient allowance"
+    assert balances[main_account] >= amount, "Insufficient balance"
+    allowances[main_account, ctx.caller] -= amount
+    balances[main_account] -= amount
+    balances[to] += amount
 
 
 @export
@@ -52,7 +49,7 @@ def balance_of(address: str):
 
 class TestWeightedLottery(unittest.TestCase):
     def setUp(self):
-        self.client = ContractingClient()
+        self.client = ContractingClient(vm_profile="xian_vm_v2")
         self.client.flush()
 
         self.client.submit(TOKEN_CODE, name="con_ticket_token")

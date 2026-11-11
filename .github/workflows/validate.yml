@@ -44,6 +44,27 @@ jobs:
           ref: main
           path: xian-linter
 
+      - name: Checkout xian-dex for reflection-token integration
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ github.repository_owner }}/xian-dex
+          ref: main
+          path: xian-dex
+
+      - name: Use matching linter and DEX branches when available
+        env:
+          MATCHING_BRANCH: ${{ github.head_ref || github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for repo in xian-linter xian-dex; do
+            remote="https://github.com/${{ github.repository_owner }}/${repo}"
+            if git ls-remote --exit-code --heads "$remote" "$MATCHING_BRANCH" >/dev/null 2>&1; then
+              git -C "$repo" fetch --depth=1 origin "$MATCHING_BRANCH"
+              git -C "$repo" checkout -B "$MATCHING_BRANCH" FETCH_HEAD
+            fi
+          done
+
       - name: Checkout xian-configs
         uses: actions/checkout@v7
         with:
@@ -83,6 +104,10 @@ jobs:
       - name: Ruff format check
         working-directory: xian-contracts
         run: uv run ruff format --check .
+
+      - name: Validate v2 package manifests and artifacts
+        working-directory: xian-contracts
+        run: uv run python scripts/validate_contracts.py
 
       - name: Audit authored contract conformance coverage
         working-directory: xian-contracts

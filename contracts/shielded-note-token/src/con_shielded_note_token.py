@@ -64,7 +64,8 @@ def require_hex_blob(name: str, value: str):
     assert len(value) > 2 and len(value) % 2 == 0, (
         name + " must contain whole bytes!"
     )
-    int(value[2:], 16)
+    for digit in value[2:]:
+        assert digit in "0123456789abcdefABCDEF", name + " must contain hexadecimal digits."
 
 
 def require_field_hex32(name: str, value: str):

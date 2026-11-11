@@ -33,8 +33,8 @@ StreamCreatedEvent = LogEvent(
         "token": {"type": str},
         "sender": {"type": str, "idx": True},
         "receiver": {"type": str, "idx": True},
-        "rate": {"type": (int, float, decimal)},
-        "deposit": {"type": (int, float, decimal)},
+        "rate": {"type": (int, decimal)},
+        "deposit": {"type": (int, decimal)},
         "begins": {"type": str},
         "closes": {"type": str},
     },
@@ -47,7 +47,7 @@ StreamBalancedEvent = LogEvent(
         "token": {"type": str},
         "sender": {"type": str, "idx": True},
         "receiver": {"type": str, "idx": True},
-        "amount": {"type": (int, float, decimal)},
+        "amount": {"type": (int, decimal)},
         "balancer": {"type": str},
     },
 )
@@ -60,7 +60,7 @@ StreamCloseChangedEvent = LogEvent(
         "receiver": {"type": str, "idx": True},
         "previous_close": {"type": str},
         "new_close": {"type": str},
-        "refund": {"type": (int, float, decimal)},
+        "refund": {"type": (int, decimal)},
     },
 )
 
@@ -70,8 +70,8 @@ StreamForfeitedEvent = LogEvent(
         "stream_id": {"type": str, "idx": True},
         "sender": {"type": str, "idx": True},
         "receiver": {"type": str, "idx": True},
-        "refunded_amount": {"type": (int, float, decimal)},
-        "claimed_amount": {"type": (int, float, decimal)},
+        "refunded_amount": {"type": (int, decimal)},
+        "claimed_amount": {"type": (int, decimal)},
         "time": {"type": str},
     },
 )
@@ -90,9 +90,7 @@ StreamFinalizedEvent = LogEvent(
 def to_decimal(value):
     if value is None:
         return ZERO
-    if isinstance(value, str):
-        return decimal(value)
-    return decimal(str(value))
+    return decimal(value)
 
 
 def stream_exists(stream_id: str):
@@ -118,7 +116,7 @@ def seconds_between(start_time, end_time):
 
 
 def total_amount_for_window(begins, closes, rate):
-    return rate * decimal(str(seconds_between(begins, closes)))
+    return rate * seconds_between(begins, closes)
 
 
 def effective_close_for_request(begins, requested_close):
@@ -142,7 +140,7 @@ def vested_amount_at(stream_id: str, as_of):
         return ZERO
 
     elapsed_seconds = seconds_between(begins, claim_cutoff)
-    return rate * decimal(str(elapsed_seconds))
+    return rate * elapsed_seconds
 
 
 def claimable_amount_internal(stream_id: str):
@@ -312,7 +310,7 @@ def seed():
 def create_stream(
     token_contract: str,
     receiver: str,
-    rate: float,
+    rate: decimal,
     begins: str,
     closes: str,
 ):
@@ -331,7 +329,7 @@ def create_stream_from_permit(
     sender: str,
     token_contract: str,
     receiver: str,
-    rate: float,
+    rate: decimal,
     begins: str,
     closes: str,
     deadline: str,

@@ -24,7 +24,7 @@ PoolCreatedEvent = LogEvent(
         "creator": {"type": str, "idx": True},
         "stake_token": {"type": str, "idx": True},
         "reward_token": {"type": str},
-        "apy": {"type": (int, float, decimal)},
+        "apy": {"type": (int, decimal)},
         "lock_duration": {"type": int},
         "max_positions": {"type": int}
     }
@@ -35,8 +35,8 @@ StakeEvent = LogEvent(
     {
         "pool_id": {"type": str, "idx": True},
         "staker": {"type": str, "idx": True},
-        "amount": {"type": (int, float, decimal)},
-        "entry_fee": {"type": (int, float, decimal)}
+        "amount": {"type": (int, decimal)},
+        "entry_fee": {"type": (int, decimal)}
     }
 )
 
@@ -45,9 +45,9 @@ UnstakeEvent = LogEvent(
     {
         "pool_id": {"type": str, "idx": True},
         "staker": {"type": str, "idx": True},
-        "amount": {"type": (int, float, decimal)},
-        "rewards": {"type": (int, float, decimal)},
-        "penalty": {"type": (int, float, decimal)},
+        "amount": {"type": (int, decimal)},
+        "rewards": {"type": (int, decimal)},
+        "penalty": {"type": (int, decimal)},
         "early": {"type": bool}
     }
 )
@@ -128,14 +128,14 @@ def available_rewards(pool):
 def create_pool(
     stake_token: str,
     reward_token: str,
-    apy: float,
+    apy: decimal,
     lock_duration: int,
     max_positions: int,
-    stake_amount: float,
+    stake_amount: decimal,
     start_date: datetime.datetime = None,
     early_withdrawal_enabled: bool = True,
-    penalty_rate: float = None,
-    entry_fee_amount: float = None,
+    penalty_rate: decimal = None,
+    entry_fee_amount: decimal = None,
     entry_fee_token: str = None
 ):
 
@@ -292,7 +292,7 @@ def unstake(pool_id: str):
     if is_early:
         assert pool["early_withdrawal_enabled"], "Early withdrawal not allowed"
     
-    # Calculate rewards (8 decimal precision)
+    # On early withdrawal, truncate the prorated reward at the chain decimal scale.
     reserved_reward = stake_info["reserved_reward"]
     max_reward = reserved_reward
     
@@ -352,7 +352,7 @@ def unstake(pool_id: str):
     })
 
 @export
-def deposit_rewards(pool_id: str, amount: float):
+def deposit_rewards(pool_id: str, amount: decimal):
     pool = pools[pool_id]
     assert pool is not None, "Pool does not exist"
     
@@ -464,7 +464,7 @@ def emergency_unpause():
     paused.set(False)
 
 @export
-def emergency_withdraw_token(token_contract: str, amount: float):
+def emergency_withdraw_token(token_contract: str, amount: decimal):
     assert ctx.caller == contract_owner.get(), "Only contract owner can emergency withdraw"
     assert paused.get(), "Contract must be paused for emergency withdrawal"
     assert amount > 0.0, "Amount must be positive"

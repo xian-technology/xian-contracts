@@ -29,16 +29,16 @@ def change_metadata(key: str, value: Any):
     metadata[key] = value
 
 @export
-def transfer(amount: float, to: str):
+def transfer(amount: decimal, to: str):
     balances[ctx.caller] -= amount
     balances[to] += amount
 
 @export
-def approve(amount: float, to: str):
+def approve(amount: decimal, to: str):
     approvals[ctx.caller, to] = amount
 
 @export
-def transfer_from(amount: float, to: str, main_account: str):
+def transfer_from(amount: decimal, to: str, main_account: str):
     approvals[main_account, ctx.caller] -= amount
     balances[main_account] -= amount
     balances[to] += amount
@@ -66,16 +66,16 @@ def change_metadata(key: str, value: Any):
     metadata[key] = value
 
 @export
-def transfer(amount: float, to: str):
+def transfer(amount: decimal, to: str):
     balances[ctx.caller] -= amount
     balances[to] += amount
 
 @export
-def approve(amount: float, to: str):
+def approve(amount: decimal, to: str):
     balances[ctx.caller, to] = amount
 
 @export
-def transfer_from(amount: float, to: str, main_account: str):
+def transfer_from(amount: decimal, to: str, main_account: str):
     balances[main_account, ctx.caller] -= amount
     balances[main_account] -= amount
     balances[to] += amount
@@ -88,7 +88,7 @@ def balance_of(account: str):
 
 class TestXSC001(unittest.TestCase):
     def setUp(self):
-        self.client = ContractingClient()
+        self.client = ContractingClient(vm_profile="xian_vm_v2")
         self.client.flush()
 
         with CONTRACT_PATH.open() as f:

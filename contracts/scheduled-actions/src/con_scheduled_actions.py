@@ -116,7 +116,7 @@ def canonicalize_scalar(value: Any):
         return "n0:"
     # Test bool before int; their values compare equal but are distinct payloads.
     for kind, tag in [(bool, "b"), (int, "i"), (str, "s"),
-                      (decimal, "d"), (float, "f"),
+                      (decimal, "d"),
                       (datetime.datetime, "t"), (datetime.timedelta, "u")]:
         if isinstance(value, kind):
             return framed(tag, str(value))
@@ -143,7 +143,7 @@ def canonicalize(value: Any):
 
 
 def payload_digest(payload: dict):
-    return hashlib.sha3_text("scheduled-actions:v2:" + canonicalize(normalize_payload(payload)))
+    return hashlib.sha3_text("scheduled-actions:v3:" + canonicalize(normalize_payload(payload)))
 
 
 def require_target_contract(target_contract: str):
@@ -220,7 +220,7 @@ def schedule_action(
     actions[action_id, "expires_at"] = expires_at
     actions[action_id, "payload"] = payload
     actions[action_id, "payload_hash"] = payload_digest(payload)
-    actions[action_id, "payload_hash_version"] = 2
+    actions[action_id, "payload_hash_version"] = 3
     actions[action_id, "memo"] = memo
     actions[action_id, "created_at"] = now
     actions[action_id, "updated_at"] = now

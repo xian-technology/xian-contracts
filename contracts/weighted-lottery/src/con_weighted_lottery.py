@@ -45,7 +45,7 @@ LotteryRefundedEvent = LogEvent(
     {
         "lottery_id": {"type": int, "idx": True},
         "account": {"type": str, "idx": True},
-        "amount": {"type": (int, float, decimal)},
+        "amount": {"type": (int, decimal)},
     },
 )
 
@@ -71,9 +71,7 @@ def seed(name: str = "Weighted Lottery", operator: str = None):
 def to_decimal(value):
     if value is None:
         return ZERO
-    if isinstance(value, str):
-        return decimal(value)
-    return decimal(str(value))
+    return decimal(value)
 
 
 def normalize_text(value: str, label: str, max_length: int):
@@ -165,7 +163,7 @@ def set_operator(operator: str):
 @export
 def create_lottery(
     token_contract: str,
-    ticket_price: Any = 1,
+    ticket_price: decimal = 1,
     close_at: Any = None,
     metadata_uri: str = "",
 ):
@@ -236,7 +234,7 @@ def buy_tickets(lottery_id: int, ticket_count: int, buyer_entropy: str = ""):
         MAX_ENTROPY_HINT_LENGTH,
     )
 
-    amount = lotteries[lottery_id, "ticket_price"] * decimal(str(ticket_count))
+    amount = lotteries[lottery_id, "ticket_price"] * ticket_count
     token_contract = lotteries[lottery_id, "token_contract"]
     token = importlib.import_module(token_contract)
     token.transfer_from(amount=amount, to=ctx.this, main_account=ctx.caller)
@@ -305,7 +303,7 @@ def claim_refund(lottery_id: int):
     assert refunds_claimed[lottery_id, ctx.caller] is False, "Refund already claimed."
 
     ticket_count = entries[lottery_id, ctx.caller]
-    amount = lotteries[lottery_id, "ticket_price"] * decimal(str(ticket_count))
+    amount = lotteries[lottery_id, "ticket_price"] * ticket_count
     refunds_claimed[lottery_id, ctx.caller] = True
     lotteries[lottery_id, "refunded_tickets"] = (
         lotteries[lottery_id, "refunded_tickets"] + ticket_count

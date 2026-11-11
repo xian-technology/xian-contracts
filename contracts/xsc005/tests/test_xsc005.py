@@ -3,6 +3,7 @@ import unittest
 from pathlib import Path
 
 from contracting.local import ContractingClient
+from xian_runtime_types.decimal import ContractingDecimal
 
 ROOT = Path(__file__).resolve().parents[1]
 CHECKER_PATH = ROOT / "src" / "con_xsc005.py"
@@ -17,19 +18,19 @@ def seed():
     balances[ctx.caller] = 1000000
 
 @export
-def transfer(amount: float, to: str):
+def transfer(amount: decimal, to: str):
     assert amount > 0, "Amount must be positive"
     assert balances[ctx.caller] >= amount, "Insufficient balance"
     balances[ctx.caller] -= amount
     balances[to] += amount
 
 @export
-def approve(amount: float, to: str):
+def approve(amount: decimal, to: str):
     assert amount >= 0, "Amount must be non-negative"
     approvals[ctx.caller, to] = amount
 
 @export
-def transfer_from(amount: float, to: str, main_account: str):
+def transfer_from(amount: decimal, to: str, main_account: str):
     assert amount > 0, "Amount must be positive"
     assert approvals[main_account, ctx.caller] >= amount, "Insufficient allowance"
     assert balances[main_account] >= amount, "Insufficient balance"
@@ -72,7 +73,7 @@ def owner_of(token_id: str):
 
 class TestXSC005(unittest.TestCase):
     def setUp(self):
-        self.client = ContractingClient()
+        self.client = ContractingClient(vm_profile="xian_vm_v2")
         self.client.flush()
 
         self.client.submit(PAYMENT_TOKEN, name="currency")
@@ -347,6 +348,15 @@ class TestXSC005(unittest.TestCase):
             self.nft.content_chunk(token_id="chunked", chunk_index=1),
             "second",
         )
+
+    def test_royalty_uses_exact_basis_points_across_decimal_range(self):
+        self.mint_inline(royalty_bps=500)
+        for price, royalty in (("1e60", "5e58"), ("39e-30", "1e-30"), ("19e-30", "0")):
+            with self.subTest(price=price):
+                result = self.nft.royalty_info(
+                    token_id="pixel-1", sale_price=ContractingDecimal(price)
+                )
+                self.assertEqual(result["amount"], ContractingDecimal(royalty))
 
     def test_marketplace_purchase_pays_seller_and_royalty(self):
         self.mint_inline()

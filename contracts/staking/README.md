@@ -17,7 +17,8 @@ controls.
 - Pool creators configure stake token, reward token, APY, lock duration, and
   optional entry-fee and penalty rules.
 - Rewards use the `annualized_v1` model. For a position, the maximum reward is
-  `stake_amount * (apy / 100) * (lock_duration / 31_536_000)`. APY is bounded
+  `stake_amount * apy / 100 * lock_duration / 31_536_000`, evaluated left to right
+  with fixed-point decimal arithmetic. Division truncates toward zero at 30 fractional places. APY is bounded
   to `0..100`, and lock duration is bounded to `3_600..31_536_000` seconds.
 - Reward deposits back accepted positions: each stake reserves its maximum
   possible reward before principal is transferred, so underfunded pools cannot

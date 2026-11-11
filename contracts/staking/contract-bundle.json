@@ -3,7 +3,7 @@
   "schema_version": 1,
   "name": "staking",
   "display_name": "Staking",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Annualized multi-pool staking with funded rewards, custody liabilities, and excess-only recovery.",
   "source": {
     "repo": "https://github.com/xian-technology/xian-contracts"
@@ -13,7 +13,7 @@
       "name": "con_staking",
       "role": "staking",
       "path": "src/con_staking.py",
-      "sha256": "40be088c0056bf32a6f8e8b622ee05789715bbb6f0a2c7132775060e7c0f512e",
+      "sha256": "22f736c59c22fbbdc6ad41fffa2438d2af052dbdb6da590f20d9cdb269800bda",
       "deploy_order": 10
     }
   ]

@@ -173,7 +173,9 @@ class TestShieldedCommands(unittest.TestCase):
 
     def setUp(self):
         self._storage_home = tempfile.TemporaryDirectory()
-        self.client = ContractingClient(storage_home=Path(self._storage_home.name))
+        self.client = ContractingClient(
+            vm_profile="xian_vm_v2", storage_home=Path(self._storage_home.name)
+        )
         self.client.flush()
 
         with ZK_REGISTRY_PATH.open() as registry_file:

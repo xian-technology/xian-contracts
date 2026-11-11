@@ -2,7 +2,7 @@ data = Hash(default_value='')
 
 
 @export
-def lottery_start(lottery_id: int, token_contract: str, total_amount: float):
+def lottery_start(lottery_id: int, token_contract: str, total_amount: decimal):
     assert data[lottery_id] == '', 'Lottery with this ID already exists!'
     assert total_amount > 0, 'Lottery amount must be positive!'
 
@@ -45,6 +45,7 @@ def lottery_end(lottery_id: int):
     if len(users) < 1:
         winner = data[lottery_id, 'creator']
     else:
+        random.seed()
         index = random.randint(0, len(users) - 1)
         winner = data[lottery_id, 'users'][index]
 

@@ -25,7 +25,7 @@ token contract. Each stream:
 
 ## Implementation Model
 
-- using `decimal(...)`-backed arithmetic
+- multiplying the fixed-point decimal rate by an integer count of elapsed seconds
 - making elapsed-time handling explicit and covering it with package-local
   tests
 - escrowing the full stream deposit into the contract at creation time
