@@ -199,6 +199,16 @@ def field(value: int) -> str:
     return f"0x{value:064x}"
 
 
+def negated_proof(proof_hex: str) -> str:
+    """The same Groth16 proof with A and B negated: e(-A, -B) = e(A, B), so it
+    verifies, but its bytes differ (arkworks' compressed points carry the y
+    sign in the top bit of their last byte: A is bytes 0-31, B bytes 32-95)."""
+    proof = bytearray.fromhex(proof_hex[2:])
+    proof[31] ^= 0x80
+    proof[95] ^= 0x80
+    return "0x" + proof.hex()
+
+
 def indexed_tx(
     function: str,
     kwargs: dict[str, object],
@@ -397,6 +407,139 @@ class TestShieldedNoteToken(unittest.TestCase):
         )
 
         return deposit_result, transfer_result, withdraw_result
+
+    def withdraw_with(self, proof_hex: str):
+        withdraw = self.fixture["withdraw"]
+        return self.token.withdraw_shielded(
+            amount=withdraw["amount"],
+            to=withdraw["recipient"],
+            old_root=withdraw["old_root"],
+            input_nullifiers=withdraw["input_nullifiers"],
+            output_commitments=withdraw["output_commitments"],
+            proof_hex=proof_hex,
+            signer=self.alice,
+        )
+
+    def test_a_valid_proof_replayed_is_stopped_by_its_spent_nullifier(self):
+        self.run_real_flow()
+        # The withdraw's old root is still in the window, so the replayed
+        # proof verifies and only the nullifier set stops it.
+        self.assertTrue(
+            self.token.is_root_accepted(root=self.fixture["withdraw"]["old_root"], signer="sys")
+        )
+        with self.assertRaisesRegex(AssertionError, "Nullifier already spent!"):
+            self.withdraw_with(self.fixture["withdraw"]["proof_hex"])
+        self.assertEqual(self.token.balance_of(address=self.bob, signer="sys"), 20)
+        self.assertSupply(total=100, public=50, shielded=50)
+
+    def test_a_malleated_proof_cannot_spend_a_note_twice(self):
+        self.run_real_flow()
+        malleated = negated_proof(self.fixture["withdraw"]["proof_hex"])
+        self.assertNotEqual(malleated, self.fixture["withdraw"]["proof_hex"])
+        with self.assertRaisesRegex(AssertionError, "Nullifier already spent!"):
+            self.withdraw_with(malleated)
+        self.assertEqual(self.token.balance_of(address=self.bob, signer="sys"), 20)
+        self.assertSupply(total=100, public=50, shielded=50)
+
+    def test_a_malleated_proof_verifies_once(self):
+        # Groth16 proofs are malleable: the negated proof is a different valid
+        # proof of the same statement, so nothing may key on proof bytes.
+        self.token.mint_public(amount=200, to=self.alice, signer="sys")
+        deposit = self.fixture["deposit"]
+        self.token.deposit_shielded(
+            amount=deposit["amount"],
+            old_root=deposit["old_root"],
+            output_commitments=deposit["output_commitments"],
+            proof_hex=negated_proof(deposit["proof_hex"]),
+            signer=self.alice,
+        )
+        self.assertSupply(total=200, public=130, shielded=70)
+        with self.assertRaisesRegex(AssertionError, "Commitment already exists!"):
+            self.token.deposit_shielded(
+                amount=deposit["amount"],
+                old_root=deposit["old_root"],
+                output_commitments=deposit["output_commitments"],
+                proof_hex=deposit["proof_hex"],
+                signer=self.alice,
+            )
+        self.assertSupply(total=200, public=130, shielded=70)
+
+    def test_proofs_do_not_replay_on_another_token_contract(self):
+        with CONTRACT_PATH.open() as contract_file:
+            self.client.submit(
+                contract_file.read(),
+                name="con_shielded_note_token_b",
+                constructor_args={"root_window_size": 3},
+            )
+        other = self.client.get_contract_proxy("con_shielded_note_token_b")
+        for action, vk in zip(
+            ("deposit", "transfer", "withdraw"), self.fixture["verifying_keys"], strict=True
+        ):
+            other.configure_vk(action=action, vk_id=vk["vk_id"], signer="sys")
+        other.mint_public(amount=100, to=self.alice, signer="sys")
+        deposit = self.fixture["deposit"]
+        with self.assertRaisesRegex(AssertionError, "Invalid proof!"):
+            other.deposit_shielded(
+                amount=deposit["amount"],
+                old_root=deposit["old_root"],
+                output_commitments=deposit["output_commitments"],
+                proof_hex=deposit["proof_hex"],
+                signer=self.alice,
+            )
+        self.assertEqual(other.balance_of(address=self.alice, signer="sys"), 100)
+
+    @pytest.mark.slow
+    def test_a_transfer_spending_one_note_twice_is_refused(self):
+        # The transfer circuit lets two inputs open the same note (40 in
+        # twice, 80 out); only the contract's nullifier set refuses it.
+        prover = ShieldedNoteProver.build_insecure_dev_bundle()
+        asset_id = self.token.asset_id(signer="sys")
+        note = ShieldedNote(owner_secret=field(101), amount=40, rho=field(1001), blind=field(2001))
+        deposit = prover.prove_deposit(
+            ShieldedDepositRequest(
+                asset_id=asset_id,
+                old_root=zero_root(),
+                append_state=tree_state([]),
+                amount=40,
+                outputs=[note.to_output()],
+            )
+        )
+        self.token.mint_public(amount=40, to=self.alice, signer="sys")
+        self.token.deposit_shielded(
+            amount=40,
+            old_root=deposit.old_root,
+            output_commitments=deposit.output_commitments,
+            proof_hex=deposit.proof_hex,
+            signer=self.alice,
+        )
+        [found] = scan_notes(
+            asset_id=asset_id, commitments=deposit.output_commitments, notes=[note]
+        )
+        doubled = ShieldedNote(
+            owner_secret=field(101), amount=80, rho=field(1009), blind=field(2009)
+        )
+        transfer = prover.prove_transfer(
+            ShieldedTransferRequest(
+                asset_id=asset_id,
+                old_root=deposit.expected_new_root,
+                append_state=tree_state(deposit.output_commitments),
+                inputs=[found.to_input(), found.to_input()],
+                outputs=[doubled.to_output()],
+            )
+        )
+        self.assertEqual(transfer.input_nullifiers[0], transfer.input_nullifiers[1])
+        with self.assertRaisesRegex(AssertionError, "Nullifier already spent!"):
+            self.token.transfer_shielded(
+                old_root=transfer.old_root,
+                input_nullifiers=transfer.input_nullifiers,
+                output_commitments=transfer.output_commitments,
+                proof_hex=transfer.proof_hex,
+                signer=self.alice,
+            )
+        self.assertFalse(
+            self.token.has_commitment(commitment=transfer.output_commitments[0], signer="sys")
+        )
+        self.assertSupply(total=40, public=0, shielded=40)
 
     def test_seed_initializes_root_window_and_metadata(self):
         config = self.token.get_proof_config(signer="sys")
