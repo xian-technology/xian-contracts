@@ -13,7 +13,7 @@
       "name": "con_profile_registry",
       "role": "registry",
       "path": "src/con_profile_registry.py",
-      "sha256": "4d350c855014045a661c4def39e0abd8364ff45ffa8ba6a6f7090d8d43062e2f",
+      "sha256": "7a19f1e355c3e86121d31bec073e2facbc7c226e5cebfcd610cd9ed6f5781464",
       "deploy_order": 10
     }
   ]

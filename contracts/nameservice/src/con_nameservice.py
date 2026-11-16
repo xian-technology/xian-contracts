@@ -32,6 +32,14 @@ def seed():
 
 # Helper functions
 
+def require_canonical_hex_account(account: str):
+    if len(account) != 64 or account == account.lower():
+        return
+    for character in account:
+        if character not in "0123456789abcdefABCDEF":
+            return
+    assert False, "Hex account must be a canonical lowercase 64-hex key."
+
 def assert_is_manager():
     assert ctx.caller == manager.get(), "You are not the manager"
 
@@ -99,6 +107,7 @@ def mint_name(name: str):
 
 @export
 def transfer(name: str, to: str):
+    require_canonical_hex_account(to)
     assert_is_not_expired(name)
     assert to != ctx.caller, "You cannot transfer to yourself"
     assert name != "", "Please specify the Name you want to transfer"
@@ -117,6 +126,7 @@ def transfer(name: str, to: str):
 
 @export
 def approve(name: str, to: str):
+    require_canonical_hex_account(to)
     assert_is_not_expired(name)
     assert_is_owner(ctx.caller, name)
     approvals[ctx.caller, to, name] = 1
@@ -132,6 +142,7 @@ def revoke_approval(name: str, to: str):
 
 @export
 def transfer_from(name: str, to: str, main_account: str):
+    require_canonical_hex_account(to)
     assert_if_contract_is_approved(ctx.caller)
     assert to != main_account, "You cannot transfer to yourself"
     assert name != "", "Please specify the Name you want to transfer"
@@ -235,6 +246,7 @@ def set_royalty_fee_percentage(percentage: int):
 @export
 def set_manager(new_manager: str):
     assert_is_manager()
+    require_canonical_hex_account(new_manager)
     manager.set(new_manager)
 
 

@@ -19,6 +19,9 @@ data.
   association. The new owner must explicitly select it as their primary name.
 - The manager controls pricing, registration period, contract allowlist, and
   whether the registry is enabled.
+- Hex public-key recipients and replacement managers must use canonical
+  lowercase spelling. Mixed-case hex keys cannot receive spendable ownership;
+  named contract accounts retain their exact spelling.
 - Contract callers whose names start with `con_` must be explicitly allowlisted
   to interact with the registry.
 

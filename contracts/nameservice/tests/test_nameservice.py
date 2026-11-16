@@ -1,10 +1,16 @@
+import os
 import unittest
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from contracting.local import ContractingClient
 from xian_runtime_types.time import Datetime
 
-ROOT = Path(__file__).absolute().parents[1]
+ROOT = (
+    Path(os.environ["XIAN_RECIPIENT_SOURCE_ROOT"]) / "contracts" / "nameservice"
+    if "XIAN_RECIPIENT_SOURCE_ROOT" in os.environ
+    else Path(__file__).absolute().parents[1]
+)
 CONTRACT_PATH = ROOT / "src" / "con_nameservice.py"
 
 TOKEN_CODE = """
@@ -36,7 +42,8 @@ def balance_of(address: str):
 
 class TestNameservice(unittest.TestCase):
     def setUp(self):
-        self.client = ContractingClient()
+        self.storage = TemporaryDirectory()
+        self.client = ContractingClient(storage_home=Path(self.storage.name))
         self.client.flush()
 
         self.client.submit(TOKEN_CODE, name="currency")
@@ -55,6 +62,40 @@ class TestNameservice(unittest.TestCase):
 
     def tearDown(self):
         self.client.flush()
+        self.storage.cleanup()
+
+    def test_mixed_case_hex_transfer_cannot_lock_name_ownership(self):
+        env = {"now": Datetime(2026, 1, 1)}
+        self.nameservice.mint_name(name="alice123", signer=self.alice, environment=env)
+        with self.assertRaisesRegex(AssertionError, "canonical lowercase"):
+            self.nameservice.transfer(
+                name="alice123", to="B" * 64, signer=self.alice, environment=env
+            )
+        self.assertEqual(self.nameservice.get_owner(name="alice123", environment=env), self.alice)
+
+    def test_mixed_case_hex_manager_cannot_lock_registry_authority(self):
+        with self.assertRaisesRegex(AssertionError, "canonical lowercase"):
+            self.nameservice.set_manager(new_manager="B" * 64, signer=self.manager)
+        self.nameservice.set_enabled(state=False, signer=self.manager)
+
+    def test_named_contracts_remain_valid_transfer_and_manager_targets(self):
+        env = {"now": Datetime(2026, 1, 1)}
+        self.nameservice.mint_name(name="alice123", signer=self.alice, environment=env)
+        self.nameservice.transfer(
+            name="alice123", to="con_receiver", signer=self.alice, environment=env
+        )
+        self.assertEqual(
+            self.nameservice.get_owner(name="alice123", environment=env), "con_receiver"
+        )
+        self.nameservice.set_manager(new_manager="con_governor", signer=self.manager)
+        self.nameservice.set_enabled(state=False, signer="con_governor")
+        long_contract = "con_" + "B" * 60
+        self.nameservice.transfer(
+            name="alice123", to=long_contract, signer="con_receiver", environment=env
+        )
+        self.assertEqual(
+            self.nameservice.get_owner(name="alice123", environment=env), long_contract
+        )
 
     def test_mint_normalizes_case_and_sets_owner(self):
         self.nameservice.mint_name(

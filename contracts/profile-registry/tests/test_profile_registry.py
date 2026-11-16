@@ -1,16 +1,23 @@
+import os
 import unittest
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from contracting.local import ContractingClient
 from xian_runtime_types.time import Datetime
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = (
+    Path(os.environ["XIAN_RECIPIENT_SOURCE_ROOT"]) / "contracts" / "profile-registry"
+    if "XIAN_RECIPIENT_SOURCE_ROOT" in os.environ
+    else Path(__file__).absolute().parents[1]
+)
 CONTRACT_PATH = ROOT / "src" / "con_profile_registry.py"
 
 
 class TestProfileRegistry(unittest.TestCase):
     def setUp(self):
-        self.client = ContractingClient()
+        self.storage = TemporaryDirectory()
+        self.client = ContractingClient(storage_home=Path(self.storage.name))
         self.client.flush()
 
         with CONTRACT_PATH.open() as f:
@@ -24,6 +31,7 @@ class TestProfileRegistry(unittest.TestCase):
 
     def tearDown(self):
         self.client.flush()
+        self.storage.cleanup()
 
     def register(self, signer, username):
         return self.registry.register_profile(
@@ -31,6 +39,25 @@ class TestProfileRegistry(unittest.TestCase):
             signer=signer,
             environment={"now": self.now},
         )
+
+    def test_mixed_case_hex_operator_cannot_lock_registry_authority(self):
+        with self.assertRaisesRegex(AssertionError, "canonical lowercase"):
+            self.registry.set_operator(operator="B" * 64, signer="sys")
+        self.registry.set_operator(operator="con_governor", signer="sys")
+        self.registry.set_operator(operator=self.bob, signer="con_governor")
+        self.registry.set_operator(operator="sys", signer=self.bob)
+        long_contract = "con_" + "B" * 60
+        self.registry.set_operator(operator=long_contract, signer="sys")
+        self.registry.set_operator(operator="sys", signer=long_contract)
+
+    def test_constructor_refuses_an_unspendable_hex_operator(self):
+        with self.assertRaisesRegex(AssertionError, "canonical lowercase"):
+            self.client.submit(
+                CONTRACT_PATH.read_text(),
+                name="con_bad_profile",
+                constructor_args={"operator": "B" * 64},
+            )
+        self.assertIsNone(self.client.raw_driver.get("con_bad_profile.__source__"))
 
     def test_usernames_resolve_case_insensitively(self):
         self.register(self.alice, "Alice")

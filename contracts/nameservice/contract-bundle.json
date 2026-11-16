@@ -13,7 +13,7 @@
       "name": "con_nameservice",
       "role": "registry",
       "path": "src/con_nameservice.py",
-      "sha256": "95e2816e40ec675c5814b3563d40b22ec87797f33b5bf09824d9a83867cf1213",
+      "sha256": "03a5d73ab5cd0c98a405826e67faf9ac9dcfbb7551541e890767ecc116cfb49c",
       "deploy_order": 10
     }
   ]

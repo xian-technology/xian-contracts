@@ -55,12 +55,22 @@ ChannelUpdatedEvent = LogEvent(
 def seed(name: str = "Profile Registry", operator: str = None):
     if operator is None or operator == "":
         operator = ctx.caller
+    require_canonical_hex_account(operator)
     metadata["name"] = name
     metadata["operator"] = operator
 
 
 def require_operator():
     assert ctx.caller == metadata["operator"], "Only operator can update operator."
+
+
+def require_canonical_hex_account(account: str):
+    if len(account) != 64 or account == account.lower():
+        return
+    for character in account:
+        if character not in "0123456789abcdefABCDEF":
+            return
+    assert False, "Hex account must be a canonical lowercase 64-hex key."
 
 
 def validate_identifier(value: str, label: str, max_length: int):
@@ -179,6 +189,7 @@ def require_channel_owner(channel_name: str):
 def set_operator(operator: str):
     require_operator()
     assert isinstance(operator, str) and operator != "", "operator must be non-empty."
+    require_canonical_hex_account(operator)
     metadata["operator"] = operator
     return operator
 

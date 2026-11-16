@@ -1,5 +1,9 @@
 # Profile Registry
 
+Hex public-key operators must use canonical lowercase spelling, at deployment
+and when transferring operator authority. Named contract accounts retain their
+exact spelling. Username resolution remains case-insensitive.
+
 Social profile and channel registry scaffold with username resolution, mutable
 profile fields, and owner-managed group channels.
 
