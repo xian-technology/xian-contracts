@@ -96,6 +96,7 @@ def contract_asset_id():
 
 
 def recipient_input(recipient: str):
+    require_canonical_hex_account(recipient)
     assert isinstance(recipient, str) and recipient != "", (
         "Recipient must be a non-empty string!"
     )
@@ -624,6 +625,15 @@ ShieldedOutputsCommitted = LogEvent(
 )
 
 
+def require_canonical_hex_account(account: str):
+    if len(account) != 64 or account == account.lower():
+        return
+    for character in account:
+        if character not in "0123456789abcdefABCDEF":
+            return
+    assert False, "Hex account must be a canonical lowercase 64-hex key."
+
+
 @construct
 def seed(
     token_name: str = "Shielded Note Token",
@@ -649,6 +659,7 @@ def seed(
     assert isinstance(token_logo_svg, str), "token_logo_svg must be a string!"
     assert isinstance(token_website, str), "token_website must be a string!"
 
+    require_canonical_hex_account(operator_address)
     operator.set(operator_address)
     total_supply.set(0)
     public_supply.set(0)
@@ -917,6 +928,7 @@ def allowance(owner: str, spender: str):
 
 @export
 def approve(amount: int, to: str):
+    require_canonical_hex_account(to)
     assert isinstance(amount, int) and amount >= 0, (
         "Approval amount must be a non-negative integer!"
     )
@@ -928,6 +940,7 @@ def approve(amount: int, to: str):
 
 @export
 def transfer(amount: int, to: str):
+    require_canonical_hex_account(to)
     require_positive_amount(amount)
     assert isinstance(to, str) and to != "", "Transfer target must be non-empty!"
     assert balances[ctx.caller] >= amount, "Not enough balance!"
@@ -942,6 +955,7 @@ def transfer(amount: int, to: str):
 
 @export
 def transfer_from(amount: int, to: str, main_account: str):
+    require_canonical_hex_account(to)
     require_positive_amount(amount)
     assert isinstance(to, str) and to != "", "Transfer target must be non-empty!"
     assert isinstance(main_account, str) and main_account != "", (
@@ -965,6 +979,7 @@ def transfer_from(amount: int, to: str, main_account: str):
 
 @export
 def change_operator(new_operator: str):
+    require_canonical_hex_account(new_operator)
     require_operator()
     assert isinstance(new_operator, str) and new_operator != "", (
         "New operator must be a non-empty string!"
@@ -1021,6 +1036,7 @@ def configure_vk(action: str, vk_id: str):
 
 @export
 def mint_public(amount: int, to: str):
+    require_canonical_hex_account(to)
     require_operator()
     require_positive_amount(amount)
     assert isinstance(to, str) and to != "", "Recipient must be non-empty!"

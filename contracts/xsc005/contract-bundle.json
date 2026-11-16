@@ -20,7 +20,7 @@
       "name": "con_xsc005_nft",
       "role": "reference_collection",
       "path": "src/con_xsc005_nft.py",
-      "sha256": "1409fada253e6b51b259df7a2502ca51315feaf27b4cc7f48b21b6959433d6a3",
+      "sha256": "a936a266ee68eedda9d58a558ca125c5d99ebf6d7ddb3e3dc0ddf6d734f449bf",
       "deploy_order": 20
     }
   ]

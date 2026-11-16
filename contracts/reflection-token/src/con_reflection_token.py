@@ -77,6 +77,7 @@ def counts_toward_rewards(address: str):
 
 def require_address(name: str, address: str):
     assert isinstance(address, str) and address != "", name + " must be non-empty!"
+    require_canonical_hex_account(address)
 
 
 def current_operator():
@@ -232,6 +233,15 @@ def move_tokens(sender: str, recipient: str, amount, charge_fees: bool):
             'fee_applied': charge_fees,
         }
     )
+
+
+def require_canonical_hex_account(account: str):
+    if len(account) != 64 or account == account.lower():
+        return
+    for character in account:
+        if character not in "0123456789abcdefABCDEF":
+            return
+    assert False, "Hex account must be a canonical lowercase 64-hex key."
 
 
 @construct

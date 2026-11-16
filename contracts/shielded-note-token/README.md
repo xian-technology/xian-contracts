@@ -113,6 +113,14 @@ flowchart LR
   generation. Value-bearing deployments require reviewed ceremony-derived
   proving artifacts; development setup material is test-only.
 
+
+## Account Identifiers
+
+Public-key account identifiers use exactly 64 lowercase hexadecimal characters.
+Transfers, approvals, minting, and authority changes reject mixed- or uppercase
+64-hex keys where those operations are supported. Named contract identifiers
+remain valid; contract calls do not silently change signed arguments.
+
 ## Validation
 
 - repo-wide lint and compile checks

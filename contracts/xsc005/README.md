@@ -64,6 +64,14 @@ are rejected because interface shape alone cannot prove value transfer.
 
 Listing and sale prices use `decimal`. Multiply a sale price by the exact basis-point rate to compute the royalty. The payout truncates to 30 fractional places, and the seller receives the balance of the price.
 
+
+## Account Identifiers
+
+Public-key account identifiers use exactly 64 lowercase hexadecimal characters.
+Transfers, approvals, minting, and authority changes reject mixed- or uppercase
+64-hex keys where those operations are supported. Named contract identifiers
+remain valid; contract calls do not silently change signed arguments.
+
 ## Validation
 
 Run from `xian-contracts`:

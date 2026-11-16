@@ -13,7 +13,7 @@
       "name": "con_shielded_note_token",
       "role": "token",
       "path": "src/con_shielded_note_token.py",
-      "sha256": "a264b7c6042fca15d4a0aa13dbe555d7b167d27d5075e3193356ba1395efef99",
+      "sha256": "17008c07f2292ae3101a10a5916187b7d636b44489bd5c86385ab5be2f9b534a",
       "deploy_order": 10
     }
   ]

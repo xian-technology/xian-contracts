@@ -145,6 +145,15 @@ PaletteUpdatedEvent = LogEvent(
 )
 
 
+def require_canonical_hex_account(account: str):
+    if len(account) != 64 or account == account.lower():
+        return
+    for character in account:
+        if character not in "0123456789abcdefABCDEF":
+            return
+    assert False, "Hex account must be a canonical lowercase 64-hex key."
+
+
 @construct
 def seed(
     collection_name: str = "XSC005 NFT",
@@ -157,6 +166,7 @@ def seed(
     if operator_address is None or operator_address == "":
         operator_address = ctx.caller
 
+    require_non_empty_address(operator_address, "operator_address")
     collection_operator.set(operator_address)
     assert importlib.exists(MARKETPLACE_PAYMENT_TOKEN), (
         "Seeded marketplace payment token does not exist."
@@ -215,6 +225,7 @@ def require_operator():
 
 def require_non_empty_address(address: str, label: str = "address"):
     assert isinstance(address, str) and address != "", label + " must be non-empty."
+    require_canonical_hex_account(address)
 
 
 def validate_token_id(token_id: str):
