@@ -63,6 +63,14 @@ def annualized_reward(stake_amount, apy, lock_duration):
     return stake_amount * apy / 100.0 * lock_duration / SECONDS_PER_YEAR
 
 
+def receive_tokens(token_contract: str, amount: decimal):
+    token = importlib.import_module(token_contract)
+    assert importlib.has_export(token_contract, "balance_of"), "Funding token must export balance_of."
+    balance_before = token.balance_of(address=ctx.this)
+    token.transfer_from(amount=amount, to=ctx.this, main_account=ctx.caller)
+    assert token.balance_of(address=ctx.this) == balance_before + amount, "Staking requires an exact token transfer."
+
+
 def max_reward_for_pool(pool):
     return annualized_reward(
         pool["stake_amount"],
@@ -223,12 +231,7 @@ def stake(pool_id: str):
     # Handle entry fee
     entry_fee_paid = 0.0
     if pool["entry_fee_amount"] > 0.0:
-        fee_token = importlib.import_module(pool["entry_fee_token"])
-        fee_token.transfer_from(
-            amount=pool["entry_fee_amount"],
-            to=ctx.this,
-            main_account=ctx.caller
-        )
+        receive_tokens(pool["entry_fee_token"], pool["entry_fee_amount"])
         entry_fee_paid = pool["entry_fee_amount"]
         increase_creator_liability(
             pool["entry_fee_token"],
@@ -239,12 +242,7 @@ def stake(pool_id: str):
         pool["creator_fees_collected"] = pool["creator_fees_collected"] + entry_fee_paid
     
     # Transfer stake tokens
-    stake_token = importlib.import_module(pool["stake_token"])
-    stake_token.transfer_from(
-        amount=pool["stake_amount"],
-        to=ctx.this,
-        main_account=ctx.caller
-    )
+    receive_tokens(pool["stake_token"], pool["stake_amount"])
     increase_principal_liability(pool["stake_token"], pool["stake_amount"])
     
     # Record stake
@@ -317,17 +315,10 @@ def unstake(pool_id: str):
     # Calculate final amounts
     stake_return = stake_info["amount"] - penalty
     
-    # Transfer stake tokens back (minus penalty)
-    if stake_return > 0.0:
-        stake_token = importlib.import_module(pool["stake_token"])
-        stake_token.transfer(amount=stake_return, to=ctx.caller)
+    # Complete settlement before calling a token that can call back into staking.
     decrease_principal_liability(pool["stake_token"], stake_info["amount"])
     increase_creator_liability(pool["stake_token"], penalty)
-    
-    # Transfer rewards
     if reward_earned > 0.0:
-        reward_token = importlib.import_module(pool["reward_token"])
-        reward_token.transfer(amount=reward_earned, to=ctx.caller)
         decrease_reward_liability(pool["reward_token"], reward_earned)
 
     pool["total_rewards_reserved"] = pool["total_rewards_reserved"] - reserved_reward
@@ -341,6 +332,14 @@ def unstake(pool_id: str):
     
     # Remove stake record
     stakes[pool_id, ctx.caller] = None
+
+    # Transfer stake tokens back (minus penalty) and rewards.
+    if stake_return > 0.0:
+        stake_token = importlib.import_module(pool["stake_token"])
+        stake_token.transfer(amount=stake_return, to=ctx.caller)
+    if reward_earned > 0.0:
+        reward_token = importlib.import_module(pool["reward_token"])
+        reward_token.transfer(amount=reward_earned, to=ctx.caller)
     
     UnstakeEvent({
         "pool_id": pool_id,
@@ -360,12 +359,7 @@ def deposit_rewards(pool_id: str, amount: decimal):
     assert amount > 0.0, "Amount must be positive"
     
     # Transfer reward tokens to contract
-    reward_token = importlib.import_module(pool["reward_token"])
-    reward_token.transfer_from(
-        amount=amount,
-        to=ctx.this,
-        main_account=ctx.caller
-    )
+    receive_tokens(pool["reward_token"], amount)
     increase_reward_liability(pool["reward_token"], amount)
     
     # Update pool rewards
@@ -382,21 +376,22 @@ def withdraw_creator_fees(pool_id: str):
     total_fees = pool["creator_fees_collected"]
     total_penalties = pool["creator_penalties_collected"]
     
-    # Withdraw entry fees
+    # Clear both claims before either token can call back into this withdrawal.
+    if total_fees > 0.0 and pool["entry_fee_token"] is not None:
+        decrease_creator_liability(pool["entry_fee_token"], total_fees)
+        pool["creator_fees_collected"] = 0.0
+    if total_penalties > 0.0:
+        decrease_creator_liability(pool["stake_token"], total_penalties)
+        pool["creator_penalties_collected"] = 0.0
+    pools[pool_id] = pool
+
+    # Withdraw entry fees and penalties (in stake token).
     if total_fees > 0.0 and pool["entry_fee_token"] is not None:
         fee_token = importlib.import_module(pool["entry_fee_token"])
         fee_token.transfer(amount=total_fees, to=ctx.caller)
-        decrease_creator_liability(pool["entry_fee_token"], total_fees)
-        pool["creator_fees_collected"] = 0.0
-    
-    # Withdraw penalties (in stake token)
     if total_penalties > 0.0:
         stake_token = importlib.import_module(pool["stake_token"])
         stake_token.transfer(amount=total_penalties, to=ctx.caller)
-        decrease_creator_liability(pool["stake_token"], total_penalties)
-        pool["creator_penalties_collected"] = 0.0
-    
-    pools[pool_id] = pool
 
 @export
 def get_pool_info(pool_id: str):

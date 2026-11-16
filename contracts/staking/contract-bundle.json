@@ -13,7 +13,7 @@
       "name": "con_staking",
       "role": "staking",
       "path": "src/con_staking.py",
-      "sha256": "22f736c59c22fbbdc6ad41fffa2438d2af052dbdb6da590f20d9cdb269800bda",
+      "sha256": "227649da05677be110fe8cbb8b6570e58541778783cdb9489d6024e568b2171a",
       "deploy_order": 10
     }
   ]

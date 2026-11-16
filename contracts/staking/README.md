@@ -26,6 +26,10 @@ controls.
 - Principal, deposited rewards, and creator-owned fees/penalties are tracked as
   separate per-token liabilities. `get_token_liability(...)` exposes their
   totals for custody monitoring.
+- Principal, rewards, and entry-fee funding must increase custody by exactly
+  the requested amount before any liability is credited. Funding tokens must
+  export `balance_of(address)`; fee-on-transfer and no-op incoming transfers
+  are rejected atomically.
 - Emergency recovery is excess-only: while paused, the contract owner may call
   `emergency_withdraw_token(...)` only up to
   `get_recoverable_excess(...)`. Active principal, unpaid reward deposits, and
@@ -47,6 +51,12 @@ increase principal liability; unstaking removes the full principal liability
 and moves any early-withdrawal penalty into creator liability until the pool
 creator withdraws it. Unsolicited token transfers do not change liabilities and
 are therefore the only balances eligible for emergency recovery.
+
+
+Settlement updates positions, pool reservations/statistics, and token liabilities
+before any outgoing token call. Contract-owned positions and creator accounts
+therefore settle once even when a token invokes another contract during payout.
+A failed payout reverts the entire settlement, including both asset transfers.
 
 ## Validation
 

@@ -49,8 +49,14 @@ The streamed token contract must expose:
 
 - `transfer(amount, to)`
 - `transfer_from(amount, to, main_account)`
+- `balance_of(address)`
 
 The contract validates that interface before using the token.
+It verifies the exact escrow balance increase before creating a stream, so
+fee-on-transfer and no-op funding cannot leave promises backed by other streams'
+assets. Receivers that are 64-character hexadecimal account keys must use
+lowercase; named destinations retain their exact spelling. Permit parameters
+are validated without silently changing their signed values.
 
 ## Caveats
 

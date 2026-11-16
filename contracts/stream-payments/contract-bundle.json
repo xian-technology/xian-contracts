@@ -13,7 +13,7 @@
       "name": "con_stream_payments",
       "role": "streaming",
       "path": "src/con_stream_payments.py",
-      "sha256": "03c0ff72c8c2abc60d1d167cea963c2ec01598fe7462733dcf8aaf040a235789",
+      "sha256": "64d3f506c81f3ed0ad95e6c82b11f725b59ea3c3503f8b3ddd9f0db7586751ff",
       "deploy_order": 10
     }
   ]

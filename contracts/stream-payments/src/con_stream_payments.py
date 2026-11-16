@@ -23,6 +23,7 @@ sender_nonces = Hash(default_value=0)
 TOKEN_INTERFACE = [
     importlib.Func("transfer", args=("amount", "to")),
     importlib.Func("transfer_from", args=("amount", "to", "main_account")),
+    importlib.Func("balance_of", args=("address",)),
 ]
 
 
@@ -166,6 +167,16 @@ def stream_id_for(sender: str, receiver: str, token_contract: str, begins, close
     )
 
 
+def require_receiver(receiver: str):
+    assert isinstance(receiver, str) and receiver != "", "Receiver must be provided."
+    if len(receiver) != 64 or receiver == receiver.lower():
+        return
+    for character in receiver.lower():
+        if character not in "0123456789abcdef":
+            return
+    assert False, "Receiver key must use canonical lowercase hex."
+
+
 def perform_create_stream(
     sender: str,
     receiver: str,
@@ -176,7 +187,7 @@ def perform_create_stream(
 ):
     rate_value = to_decimal(rate)
 
-    assert receiver != "", "Receiver must be provided."
+    require_receiver(receiver)
     assert sender != receiver, "Sender and receiver must be different."
     assert begins < closes, "Stream cannot begin after the close date."
     assert rate_value > ZERO, "Rate must be greater than zero."
@@ -195,11 +206,13 @@ def perform_create_stream(
     )
     assert not stream_exists(stream_id), "Stream already exists."
 
+    escrow_before = token.balance_of(address=ctx.this)
     token.transfer_from(
         amount=deposit,
         to=ctx.this,
         main_account=sender,
     )
+    assert token.balance_of(address=ctx.this) == escrow_before + deposit, "Stream requires an exact escrow transfer."
 
     streams[stream_id, TOKEN_KEY] = token_contract
     streams[stream_id, SENDER_KEY] = sender
