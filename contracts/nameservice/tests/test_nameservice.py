@@ -6,6 +6,8 @@ from tempfile import TemporaryDirectory
 from contracting.local import ContractingClient
 from xian_runtime_types.time import Datetime
 
+from conftest import checkpoint_time, deploy_time_checkpoints
+
 ROOT = (
     Path(os.environ["XIAN_RECIPIENT_SOURCE_ROOT"]) / "contracts" / "nameservice"
     if "XIAN_RECIPIENT_SOURCE_ROOT" in os.environ
@@ -45,6 +47,8 @@ class TestNameservice(unittest.TestCase):
         self.storage = TemporaryDirectory()
         self.client = ContractingClient(storage_home=Path(self.storage.name))
         self.client.flush()
+        deploy_time_checkpoints(self.client)
+        self.lease_height = 100
 
         self.client.submit(TOKEN_CODE, name="currency")
 
@@ -64,9 +68,21 @@ class TestNameservice(unittest.TestCase):
         self.client.flush()
         self.storage.cleanup()
 
+    def mint_and_checkpoint(self, **kwargs):
+        environment = dict(kwargs.pop("environment", {}) or {})
+        environment["block_num"] = self.lease_height
+        result = self.nameservice.mint_name(environment=environment, **kwargs)
+        checkpoint_time(
+            self.client,
+            height=self.lease_height + 1,
+            now=environment.get("now", Datetime(2026, 1, 1)),
+        )
+        self.lease_height += 2
+        return result
+
     def test_mixed_case_hex_transfer_cannot_lock_name_ownership(self):
         env = {"now": Datetime(2026, 1, 1)}
-        self.nameservice.mint_name(name="alice123", signer=self.alice, environment=env)
+        self.mint_and_checkpoint(name="alice123", signer=self.alice, environment=env)
         with self.assertRaisesRegex(AssertionError, "canonical lowercase"):
             self.nameservice.transfer(
                 name="alice123", to="B" * 64, signer=self.alice, environment=env
@@ -80,7 +96,7 @@ class TestNameservice(unittest.TestCase):
 
     def test_named_contracts_remain_valid_transfer_and_manager_targets(self):
         env = {"now": Datetime(2026, 1, 1)}
-        self.nameservice.mint_name(name="alice123", signer=self.alice, environment=env)
+        self.mint_and_checkpoint(name="alice123", signer=self.alice, environment=env)
         self.nameservice.transfer(
             name="alice123", to="con_receiver", signer=self.alice, environment=env
         )
@@ -98,7 +114,7 @@ class TestNameservice(unittest.TestCase):
         )
 
     def test_mint_normalizes_case_and_sets_owner(self):
-        self.nameservice.mint_name(
+        self.mint_and_checkpoint(
             name="Alice123",
             signer=self.alice,
             environment={"now": Datetime(2026, 1, 1)},
@@ -111,7 +127,7 @@ class TestNameservice(unittest.TestCase):
 
     def test_blacklist_applies_after_lowercase_normalization(self):
         with self.assertRaises(AssertionError):
-            self.nameservice.mint_name(
+            self.mint_and_checkpoint(
                 name="Validators",
                 signer=self.alice,
                 environment={"now": Datetime(2026, 1, 1)},
@@ -122,11 +138,11 @@ class TestNameservice(unittest.TestCase):
         later = {"now": Datetime(2027, 1, 2)}
         bob = "b" * 64
         self.currency.transfer(amount=100, to=bob, signer=self.manager)
-        self.nameservice.mint_name(name="alice123", signer=self.alice, environment=first)
+        self.mint_and_checkpoint(name="alice123", signer=self.alice, environment=first)
         self.nameservice.set_main_name_to_caller(
             name="alice123", signer=self.alice, environment=first
         )
-        self.nameservice.mint_name(name="alice123", signer=bob, environment=later)
+        self.mint_and_checkpoint(name="alice123", signer=bob, environment=later)
         self.assertEqual(self.nameservice.get_owner(name="alice123", environment=later), bob)
         self.assertIsNone(
             self.nameservice.get_main_name_to_address(name="alice123", environment=later)
@@ -138,7 +154,7 @@ class TestNameservice(unittest.TestCase):
     def test_old_recipient_approval_does_not_revive_after_ownership_cycle(self):
         env = {"now": Datetime(2026, 1, 1)}
         bob, carol = "b" * 64, "c" * 64
-        self.nameservice.mint_name(name="alice123", signer=self.alice, environment=env)
+        self.mint_and_checkpoint(name="alice123", signer=self.alice, environment=env)
         self.nameservice.approve(name="alice123", to=carol, signer=self.alice, environment=env)
         self.nameservice.transfer(name="alice123", to=bob, signer=self.alice, environment=env)
         self.nameservice.transfer(name="alice123", to=self.alice, signer=bob, environment=env)
@@ -157,9 +173,9 @@ class TestNameservice(unittest.TestCase):
         first = {"now": Datetime(2026, 1, 1)}
         later = {"now": Datetime(2027, 1, 2)}
         bob = "b" * 64
-        self.nameservice.mint_name(name="alice123", signer=self.alice, environment=first)
+        self.mint_and_checkpoint(name="alice123", signer=self.alice, environment=first)
         self.nameservice.approve(name="alice123", to=bob, signer=self.alice, environment=first)
-        self.nameservice.mint_name(name="alice123", signer=self.alice, environment=later)
+        self.mint_and_checkpoint(name="alice123", signer=self.alice, environment=later)
         with self.assertRaisesRegex(AssertionError, "not approved"):
             self.nameservice.transfer_from(
                 name="alice123", to=bob, main_account=self.alice, signer=bob, environment=later

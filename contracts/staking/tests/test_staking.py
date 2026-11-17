@@ -6,6 +6,8 @@ from contracting.local import ContractingClient
 from xian_runtime_types.decimal import ContractingDecimal
 from xian_runtime_types.time import Datetime
 
+from conftest import checkpoint_time, deploy_time_checkpoints
+
 SECONDS_PER_YEAR = 31_536_000
 DAILY_REWARD = ContractingDecimal("0.027397260273972602739726027397")
 HALF_DAY_REWARD = ContractingDecimal("0.013698630136986301369863013698")
@@ -34,6 +36,8 @@ class TestStakingContract(unittest.TestCase):
     def setUp(self):
         self.client = ContractingClient()
         self.client.flush()
+        deploy_time_checkpoints(self.client)
+        self.position_block = 100
 
         # Load and submit the staking contract
         contract_path = Path(__file__).resolve().parents[1] / "src" / "con_staking.py"
@@ -114,12 +118,35 @@ def approve(amount: decimal, to: str):
         self.client.flush()
 
     def deposit_pool_rewards(self, pool_id="0", amount=1000):
-        self.staking.deposit_rewards(
+        self.deposit_and_checkpoint(
             pool_id=pool_id,
             amount=amount,
             signer=self.creator,
             environment={"now": self.test_time},
         )
+
+    def deposit_and_checkpoint(self, **kwargs):
+        environment = dict(kwargs.pop("environment", {}) or {})
+        environment["block_num"] = self.position_block
+        result = self.staking.deposit_rewards(environment=environment, **kwargs)
+        checkpoint_time(
+            self.client, height=self.position_block + 1, now=environment.get("now", self.test_time)
+        )
+        self.position_block += 2
+        return result
+
+    def stake_and_checkpoint(self, **kwargs):
+        """Exercise the public deposit and successor activation workflow."""
+        environment = dict(kwargs.pop("environment", {}) or {})
+        environment["block_num"] = self.position_block
+        result = self.staking.stake(environment=environment, **kwargs)
+        if kwargs.get("return_full_output") and result["status_code"] != 0:
+            return result
+        checkpoint_time(
+            self.client, height=self.position_block + 1, now=environment.get("now", self.test_time)
+        )
+        self.position_block += 2
+        return result
 
     # Constructor Tests
     def test_contract_initialization(self):
@@ -356,7 +383,7 @@ def approve(amount: decimal, to: str):
         self.deposit_pool_rewards()
 
         # Stake
-        result = self.staking.stake(
+        result = self.stake_and_checkpoint(
             pool_id="0",
             signer=self.staker1,
             environment={"now": self.test_time},
@@ -413,7 +440,7 @@ def approve(amount: decimal, to: str):
         )
 
         with self.assertRaises(AssertionError) as context:
-            self.staking.stake(
+            self.stake_and_checkpoint(
                 pool_id="0",
                 signer=self.staker1,
                 environment={"now": self.test_time},
@@ -445,14 +472,14 @@ def approve(amount: decimal, to: str):
         )
         self.deposit_pool_rewards(amount=ContractingDecimal("0.03"))
 
-        self.staking.stake(
+        self.stake_and_checkpoint(
             pool_id="0",
             signer=self.staker1,
             environment={"now": self.test_time},
         )
 
         with self.assertRaises(AssertionError) as context:
-            self.staking.stake(
+            self.stake_and_checkpoint(
                 pool_id="0",
                 signer=self.staker2,
                 environment={"now": self.test_time},
@@ -473,7 +500,7 @@ def approve(amount: decimal, to: str):
         )
 
         with self.assertRaises(AssertionError) as context:
-            self.staking.stake(
+            self.stake_and_checkpoint(
                 pool_id="0",
                 signer=self.staker2,
                 environment={"now": later_time},
@@ -481,7 +508,7 @@ def approve(amount: decimal, to: str):
         self.assertIn("Insufficient reward funding", str(context.exception))
 
         self.deposit_pool_rewards(amount=ContractingDecimal("0.03"))
-        self.staking.stake(
+        self.stake_and_checkpoint(
             pool_id="0",
             signer=self.staker2,
             environment={"now": later_time},
@@ -514,7 +541,7 @@ def approve(amount: decimal, to: str):
         self.deposit_pool_rewards()
 
         # Stake
-        self.staking.stake(
+        self.stake_and_checkpoint(
             pool_id="0",
             signer=self.staker1,
             environment={"now": self.test_time},
@@ -544,7 +571,7 @@ def approve(amount: decimal, to: str):
     def test_stake_nonexistent_pool(self):
         """Test staking in nonexistent pool fails"""
         with self.assertRaises(AssertionError) as context:
-            self.staking.stake(
+            self.stake_and_checkpoint(
                 pool_id="999",
                 signer=self.staker1,
                 environment={"now": self.test_time},
@@ -569,7 +596,7 @@ def approve(amount: decimal, to: str):
         )
 
         with self.assertRaises(AssertionError) as context:
-            self.staking.stake(
+            self.stake_and_checkpoint(
                 pool_id="0",
                 signer=self.staker1,
                 environment={"now": self.test_time},
@@ -592,7 +619,7 @@ def approve(amount: decimal, to: str):
         self.deposit_pool_rewards(amount=10)
 
         # First stake succeeds
-        self.staking.stake(
+        self.stake_and_checkpoint(
             pool_id="0",
             signer=self.staker1,
             environment={"now": self.test_time},
@@ -600,7 +627,7 @@ def approve(amount: decimal, to: str):
 
         # Second stake fails
         with self.assertRaises(AssertionError) as context:
-            self.staking.stake(
+            self.stake_and_checkpoint(
                 pool_id="0",
                 signer=self.staker2,
                 environment={"now": self.test_time},
@@ -623,7 +650,7 @@ def approve(amount: decimal, to: str):
         self.deposit_pool_rewards()
 
         # First stake succeeds
-        self.staking.stake(
+        self.stake_and_checkpoint(
             pool_id="0",
             signer=self.staker1,
             environment={"now": self.test_time},
@@ -631,7 +658,7 @@ def approve(amount: decimal, to: str):
 
         # Second stake by same user fails
         with self.assertRaises(AssertionError) as context:
-            self.staking.stake(
+            self.stake_and_checkpoint(
                 pool_id="0",
                 signer=self.staker1,
                 environment={"now": self.test_time},
@@ -656,7 +683,7 @@ def approve(amount: decimal, to: str):
         self.staking.emergency_pause(signer=self.owner)
 
         with self.assertRaises(AssertionError) as context:
-            self.staking.stake(
+            self.stake_and_checkpoint(
                 pool_id="0",
                 signer=self.staker1,
                 environment={"now": self.test_time},
@@ -679,7 +706,7 @@ def approve(amount: decimal, to: str):
         )
 
         # Deposit rewards
-        self.staking.deposit_rewards(
+        self.deposit_and_checkpoint(
             pool_id="0",
             amount=1000,
             signer=self.creator,
@@ -688,7 +715,7 @@ def approve(amount: decimal, to: str):
         self.deposit_pool_rewards()
 
         # Stake
-        self.staking.stake(
+        self.stake_and_checkpoint(
             pool_id="0",
             signer=self.staker1,
             environment={"now": self.test_time},
@@ -740,7 +767,7 @@ def approve(amount: decimal, to: str):
         )
 
         # Deposit rewards
-        self.staking.deposit_rewards(
+        self.deposit_and_checkpoint(
             pool_id="0",
             amount=1000,
             signer=self.creator,
@@ -749,7 +776,7 @@ def approve(amount: decimal, to: str):
         self.deposit_pool_rewards()
 
         # Stake
-        self.staking.stake(
+        self.stake_and_checkpoint(
             pool_id="0",
             signer=self.staker1,
             environment={"now": self.test_time},
@@ -815,7 +842,7 @@ def approve(amount: decimal, to: str):
         )
 
         # Deposit rewards
-        self.staking.deposit_rewards(
+        self.deposit_and_checkpoint(
             pool_id="0",
             amount=1000,
             signer=self.creator,
@@ -824,7 +851,7 @@ def approve(amount: decimal, to: str):
         self.deposit_pool_rewards()
 
         # Stake
-        self.staking.stake(
+        self.stake_and_checkpoint(
             pool_id="0",
             signer=self.staker1,
             environment={"now": self.test_time},
@@ -890,7 +917,7 @@ def approve(amount: decimal, to: str):
         )
         self.deposit_pool_rewards()
 
-        self.staking.stake(
+        self.stake_and_checkpoint(
             pool_id="0",
             signer=self.staker1,
             environment={"now": self.test_time},
@@ -923,7 +950,7 @@ def approve(amount: decimal, to: str):
         )
 
         # Deposit rewards
-        self.staking.deposit_rewards(
+        self.deposit_and_checkpoint(
             pool_id="0",
             amount=1000,
             signer=self.creator,
@@ -949,7 +976,7 @@ def approve(amount: decimal, to: str):
     def test_deposit_rewards_nonexistent_pool(self):
         """Test depositing rewards to nonexistent pool fails"""
         with self.assertRaises(AssertionError) as context:
-            self.staking.deposit_rewards(
+            self.deposit_and_checkpoint(
                 pool_id="999",
                 amount=1000,
                 signer=self.creator,
@@ -972,7 +999,7 @@ def approve(amount: decimal, to: str):
         )
 
         with self.assertRaises(AssertionError) as context:
-            self.staking.deposit_rewards(
+            self.deposit_and_checkpoint(
                 pool_id="0",
                 amount=1000,
                 signer=self.staker1,
@@ -995,7 +1022,7 @@ def approve(amount: decimal, to: str):
         )
 
         with self.assertRaises(AssertionError) as context:
-            self.staking.deposit_rewards(
+            self.deposit_and_checkpoint(
                 pool_id="0",
                 amount=0,
                 signer=self.creator,
@@ -1023,7 +1050,7 @@ def approve(amount: decimal, to: str):
         )
 
         # Deposit rewards
-        self.staking.deposit_rewards(
+        self.deposit_and_checkpoint(
             pool_id="0",
             amount=1000,
             signer=self.creator,
@@ -1031,7 +1058,7 @@ def approve(amount: decimal, to: str):
         )
 
         # Stake to generate entry fee
-        self.staking.stake(
+        self.stake_and_checkpoint(
             pool_id="0",
             signer=self.staker1,
             environment={"now": self.test_time},
@@ -1117,7 +1144,7 @@ def approve(amount: decimal, to: str):
         self.deposit_pool_rewards()
 
         # Stake
-        self.staking.stake(
+        self.stake_and_checkpoint(
             pool_id="0",
             signer=self.staker1,
             environment={"now": self.test_time},
@@ -1154,7 +1181,7 @@ def approve(amount: decimal, to: str):
         self.deposit_pool_rewards()
 
         # Stake
-        self.staking.stake(
+        self.stake_and_checkpoint(
             pool_id="0",
             signer=self.staker1,
             environment={"now": self.test_time},
@@ -1226,7 +1253,7 @@ def approve(amount: decimal, to: str):
             environment={"now": self.test_time},
         )
         self.deposit_pool_rewards(amount=1000)
-        self.staking.stake(
+        self.stake_and_checkpoint(
             pool_id="0",
             signer=self.staker1,
             environment={"now": self.test_time},
@@ -1363,17 +1390,17 @@ def approve(amount: decimal, to: str):
         self.deposit_pool_rewards(pool_id="1", amount=40)
 
         # Stake in both pools
-        self.staking.stake(
+        self.stake_and_checkpoint(
             pool_id="0",
             signer=self.staker1,
             environment={"now": self.test_time},
         )
-        self.staking.stake(
+        self.stake_and_checkpoint(
             pool_id="1",
             signer=self.staker1,
             environment={"now": self.test_time},
         )
-        self.staking.stake(
+        self.stake_and_checkpoint(
             pool_id="0",
             signer=self.staker2,
             environment={"now": self.test_time},
@@ -1403,13 +1430,13 @@ def approve(amount: decimal, to: str):
         )
 
         # Stake and unstake
-        self.staking.stake(
+        self.stake_and_checkpoint(
             pool_id="0",
             signer=self.staker1,
             environment={"now": self.test_time},
         )
 
-        self.staking.deposit_rewards(
+        self.deposit_and_checkpoint(
             pool_id="0",
             amount=1000,
             signer=self.creator,

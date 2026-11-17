@@ -38,6 +38,9 @@ uv run pytest -m slow
 ```
 
 The package validator compiles the authored sources for `xian_vm_v2` and validates their artifacts. Package tests execute that profile with the native VM.
+The staking and nameservice tests also load the canonical successor checkpoint
+service from the sibling `xian-configs` checkout and explicitly exercise its
+reserved node keeper. Their bundles declare that platform dependency.
 
 The default `pytest` path excludes the slow proof-generation tests. Run
 `pytest -m slow` explicitly for the heavy shielded-note proving flows.

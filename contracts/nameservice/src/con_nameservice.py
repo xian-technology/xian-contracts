@@ -1,4 +1,5 @@
 import currency
+import time_checkpoints
 
 manager = Variable()
 names = Hash(default_value=False)
@@ -6,7 +7,9 @@ balances = Hash(default_value=0)
 approvals = Hash(default_value=0)
 ownership_generation = Hash(default_value=0)
 approval_generation = Hash(default_value=0)
-expiry_times = Hash(default_value=None)
+lease_anchor_heights = Hash(default_value=None)
+lease_base_expiries = Hash(default_value=None)
+lease_period_days = Hash(default_value=0)
 owners = Hash(default_value=None)
 
 mint_price = Variable()
@@ -31,6 +34,43 @@ def seed():
 
 
 # Helper functions
+
+def request_time_anchor():
+    version = time_checkpoints.get_protocol_version()
+    assert isinstance(version, int) and not isinstance(version, bool) and version == 1, (
+        "Unsupported time checkpoint service."
+    )
+    height = time_checkpoints.request_anchor()
+    assert isinstance(height, int) and not isinstance(height, bool) and height == block_num, (
+        "Invalid time checkpoint height."
+    )
+    return height
+
+
+def validate_lease_days(days, base=None):
+    assert isinstance(days, int) and not isinstance(days, bool) and days > 0, (
+        "Registration period must be a positive integer."
+    )
+    observed_start = now
+    if base is not None and base > observed_start:
+        observed_start = base
+    # Validate representable calendar arithmetic before accepting payment.
+    observed_start + datetime.timedelta(days=days)
+    return days
+
+
+def effective_expiry(name: str):
+    height = lease_anchor_heights[name]
+    if height is None:
+        return None
+    anchor = time_checkpoints.get_anchor(height=height)
+    if anchor is None:
+        return None
+    base = lease_base_expiries[name]
+    if base is not None and base > anchor:
+        anchor = base
+    return anchor + datetime.timedelta(days=lease_period_days[name])
+
 
 def require_canonical_hex_account(account: str):
     if len(account) != 64 or account == account.lower():
@@ -63,7 +103,7 @@ def assert_is_not_blacklisted(name: str):
 
 
 def is_expired(name: str):
-    expiry = expiry_times[name]
+    expiry = effective_expiry(name)
     if expiry is None:
         return False
     return now >= expiry
@@ -91,15 +131,21 @@ def mint_name(name: str):
 
     if owners[name]:
         assert is_expired(name), "Name already exists and has not expired yet."
+    days = validate_lease_days(registration_period.get())
+    price = mint_price.get()
+    anchor_height = request_time_anchor()
+    if owners[name]:
         balances[owners[name], name] = 0
         if address_to_main_name[owners[name]] == name:
             address_to_main_name[owners[name]] = None
         main_name_to_address[name] = None
 
-    currency.transfer_from(amount=mint_price.get(), to=manager.get(), main_account=ctx.caller)
+    currency.transfer_from(amount=price, to=manager.get(), main_account=ctx.caller)
 
     names[name] = {} # This is a place for data to be stored by the current owner.. DNS, IPFS, etc
-    expiry_times[name] = now + datetime.timedelta(days=registration_period.get())
+    lease_anchor_heights[name] = anchor_height
+    lease_base_expiries[name] = None
+    lease_period_days[name] = days
     balances[ctx.caller, name] = 1
     owners[name] = ctx.caller
     ownership_generation[name] += 1
@@ -207,7 +253,7 @@ def get_owner(name: str):
 
 @export
 def get_expiry_time(name: str):
-    return expiry_times[name]
+    return effective_expiry(name)
 
 
 @export
@@ -225,9 +271,18 @@ def renew_name(name: str):
     assert_is_not_expired(name)
     assert_is_owner(ctx.caller, name)
 
-    currency.transfer_from(amount=mint_price.get(), to=manager.get(), main_account=ctx.caller)
-
-    expiry_times[name] = expiry_times[name] + datetime.timedelta(days=registration_period.get())
+    base = effective_expiry(name)
+    days = validate_lease_days(registration_period.get())
+    if base is None:
+        base = lease_base_expiries[name]
+        days = lease_period_days[name] + days
+    validate_lease_days(days, base)
+    price = mint_price.get()
+    anchor_height = request_time_anchor()
+    currency.transfer_from(amount=price, to=manager.get(), main_account=ctx.caller)
+    lease_anchor_heights[name] = anchor_height
+    lease_base_expiries[name] = base
+    lease_period_days[name] = days
 
 # Manager functions
 
@@ -259,6 +314,7 @@ def set_contract_allowlist(contracts: list):
 @export
 def set_registration_period(period: int):
     assert_is_manager()
+    validate_lease_days(period)
     registration_period.set(period)
 
 

@@ -4,6 +4,8 @@ import pytest
 from contracting.local import ContractingClient
 from xian_runtime_types.time import Datetime
 
+from conftest import checkpoint_time, deploy_time_checkpoints
+
 START = Datetime(2026, 1, 1)
 MATURE = Datetime(2027, 1, 1)
 TOKEN = """
@@ -85,6 +87,8 @@ def stake(pool_id: str):
 def settle(pool_id: str, action: str):
     if action == "unstake":
         con_staking.unstake(pool_id=pool_id)
+    elif action == "activate":
+        con_staking.activate_stake(pool_id=pool_id, staker=ctx.this)
     else:
         con_staking.withdraw_creator_fees(pool_id=pool_id)
 
@@ -99,6 +103,14 @@ def withdraw(pool_id: str, action: str, token: str):
     return callback_succeeded.get()
 
 @export
+def withdraw_with_activation_callback(pool_id: str, token: str):
+    callback_pool.set(pool_id)
+    callback_token.set(token)
+    callback_action.set("activate")
+    callback_armed.set(True)
+    con_staking.unstake(pool_id=pool_id)
+
+@export
 def on_receive(token: str):
     if callback_armed.get() and token == callback_token.get():
         callback_armed.set(False)
@@ -110,6 +122,7 @@ def on_receive(token: str):
 @pytest.fixture
 def system(tmp_path):
     client = ContractingClient(storage_home=tmp_path)
+    deploy_time_checkpoints(client)
     client.submit(
         (Path(__file__).absolute().parents[1] / "src" / "con_staking.py").read_text(),
         name="con_staking",
@@ -140,11 +153,11 @@ def create_pools(client, *, apy, entry_fee=0):
     ]
 
 
-def external_stake(client, pool_id, signer):
+def external_stake(client, pool_id, signer, height=100):
     for token in ["con_principal", "con_fee"]:
         contract(client, token).approve(amount=100, to="con_staking", signer=signer)
     contract(client, "con_staking").stake(
-        pool_id=pool_id, signer=signer, environment={"now": START}
+        pool_id=pool_id, signer=signer, environment={"now": START, "block_num": height}
     )
 
 
@@ -152,9 +165,10 @@ def funded_positions(client):
     actor = contract(client, "con_actor")
     pools = create_pools(client, apy=100)
     for pool_id in pools:
-        actor.deposit_rewards(pool_id=pool_id)
-    actor.stake(pool_id=pools[0], environment={"now": START})
+        actor.deposit_rewards(pool_id=pool_id, environment={"now": START, "block_num": 2})
+    actor.stake(pool_id=pools[0], environment={"now": START, "block_num": 100})
     external_stake(client, pools[1], "alice")
+    checkpoint_time(client, height=101, now=START)
     return pools
 
 
@@ -201,10 +215,11 @@ def test_position_settles_once_during_token_callback(system, callback_token):
 
 def creator_funds(client):
     first, second = create_pools(client, apy=0, entry_fee=10)
-    for pool_id, signer in [(first, "alice"), (second, "bob")]:
-        external_stake(client, pool_id, signer)
+    for index, (pool_id, signer) in enumerate([(first, "alice"), (second, "bob")]):
+        external_stake(client, pool_id, signer, height=100 + index * 2)
+        checkpoint_time(client, height=101 + index * 2, now=START)
         contract(client, "con_staking").unstake(
-            pool_id=pool_id, signer=signer, environment={"now": START}
+            pool_id=pool_id, signer=signer, environment={"now": START, "block_num": 100}
         )
     return first, second
 
@@ -268,3 +283,30 @@ def test_failed_payout_restores_entire_settlement(system, action, failing_token)
         assert staking.get_stake_info(pool_id=first, staker="con_actor")["amount"] == 100
     contract(system, failing_token).set_failure(enabled=False, signer="sys")
     actor.withdraw(pool_id=first, action=action, token="none", environment={"now": MATURE})
+
+
+def test_activation_callback_cannot_recreate_or_reage_a_settled_position(system):
+    first, _ = funded_positions(system)
+    actor = contract(system, "con_actor")
+    staking = contract(system, "con_staking")
+    before = pool(system, first)
+    balances = {
+        token: token_balance(system, token, "con_actor")
+        for token in ["con_principal", "con_reward"]
+    }
+    with pytest.raises(AssertionError, match="Stake not found"):
+        actor.withdraw_with_activation_callback(
+            pool_id=first, token="con_principal", environment={"now": MATURE, "block_num": 102}
+        )
+    assert pool(system, first) == before
+    assert staking.get_stake_info(pool_id=first, staker="con_actor")["amount"] == 100
+    for token, value in balances.items():
+        assert token_balance(system, token, "con_actor") == value
+    actor.withdraw(pool_id=first, action="unstake", token="none", environment={"now": MATURE})
+    with pytest.raises(AssertionError, match="Stake not found"):
+        staking.activate_stake(
+            pool_id=first,
+            staker="con_actor",
+            signer="alice",
+            environment={"now": MATURE, "block_num": 103},
+        )

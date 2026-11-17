@@ -1,3 +1,5 @@
+import time_checkpoints
+
 # General Multi-Token Staking Contract
 SECONDS_PER_YEAR = 31536000
 MIN_LOCK_DURATION = 3600
@@ -57,6 +59,30 @@ def init():
     pool_counter.set(0)
     paused.set(False)
     contract_owner.set(ctx.caller)
+
+
+def request_time_anchor():
+    version = time_checkpoints.get_protocol_version()
+    assert isinstance(version, int) and not isinstance(version, bool) and version == 1, (
+        "Unsupported time checkpoint service."
+    )
+    height = time_checkpoints.request_anchor()
+    assert isinstance(height, int) and not isinstance(height, bool) and height == block_num, (
+        "Invalid time checkpoint height."
+    )
+    return height
+
+
+def resolve_stake_time(stake_info):
+    stake_info = stake_info.copy()
+    if stake_info["start_time"] is None:
+        stake_info["start_time"] = time_checkpoints.get_anchor(height=stake_info["created_block"])
+    return stake_info
+
+
+def elapsed_stake_seconds(stake_info):
+    assert stake_info["start_time"] is not None, "Stake activation pending."
+    return (now - stake_info["start_time"]).seconds
 
 
 def annualized_reward(stake_amount, apy, lock_duration):
@@ -228,6 +254,8 @@ def stake(pool_id: str):
     reserved_reward = max_reward_for_pool(pool)
     assert available_rewards(pool) >= reserved_reward, "Insufficient reward funding"
     
+    anchor_height = request_time_anchor()
+
     # Handle entry fee
     entry_fee_paid = 0.0
     if pool["entry_fee_amount"] > 0.0:
@@ -248,7 +276,8 @@ def stake(pool_id: str):
     # Record stake
     stakes[pool_id, ctx.caller] = {
         "amount": pool["stake_amount"],
-        "start_time": now,
+        "created_block": anchor_height,
+        "start_time": None,
         "reserved_reward": reserved_reward,
         "entry_fee_paid": entry_fee_paid
     }
@@ -269,6 +298,22 @@ def stake(pool_id: str):
     })
 
 @export
+def activate_stake(pool_id: str, staker: str):
+    assert not paused.get(), "Contract is paused"
+    stored = stakes[pool_id, staker]
+    assert stored is not None, "Stake not found"
+    if stored["start_time"] is not None:
+        return stored
+    assert block_num is not None and block_num > stored["created_block"], (
+        "Stake activation requires a later block."
+    )
+    resolved = resolve_stake_time(stored)
+    assert resolved["start_time"] is not None, "Stake activation pending."
+    stakes[pool_id, staker] = resolved
+    return resolved
+
+
+@export
 def unstake(pool_id: str):
     assert not paused.get(), "Contract is paused"
     
@@ -280,12 +325,11 @@ def unstake(pool_id: str):
     
     stats = pool_stats[pool_id]
     
-    current_time = now
-    stake_start = stake_info["start_time"]
-    time_staked = current_time - stake_start
+    stake_info = resolve_stake_time(stake_info)
+    time_staked = elapsed_stake_seconds(stake_info)
     
     # Calculate if early withdrawal
-    is_early = time_staked.seconds < pool["lock_duration"]
+    is_early = time_staked < pool["lock_duration"]
     
     if is_early:
         assert pool["early_withdrawal_enabled"], "Early withdrawal not allowed"
@@ -296,7 +340,7 @@ def unstake(pool_id: str):
     
     if is_early:
         # Proportional rewards based on time staked
-        reward_earned = max_reward * time_staked.seconds / pool["lock_duration"]
+        reward_earned = max_reward * time_staked / pool["lock_duration"]
     else:
         reward_earned = max_reward
 
@@ -305,7 +349,7 @@ def unstake(pool_id: str):
     # Calculate penalty
     penalty = 0.0
     if is_early and pool["penalty_rate"] > 0.0:
-        time_remaining = pool["lock_duration"] - time_staked.seconds
+        time_remaining = pool["lock_duration"] - time_staked
         penalty_factor = time_remaining / pool["lock_duration"]
         penalty = stake_info["amount"] * pool["penalty_rate"] * penalty_factor
         
@@ -358,6 +402,8 @@ def deposit_rewards(pool_id: str, amount: decimal):
     assert ctx.caller == pool["creator"], "Only pool creator can deposit rewards"
     assert amount > 0.0, "Amount must be positive"
     
+    # Check the required platform keeper before accepting any new custody.
+    request_time_anchor()
     # Transfer reward tokens to contract
     receive_tokens(pool["reward_token"], amount)
     increase_reward_liability(pool["reward_token"], amount)
@@ -409,7 +455,7 @@ def get_pool_info(pool_id: str):
 def get_stake_info(pool_id: str, staker: str):
     stake_info = stakes[pool_id, staker]
     assert stake_info is not None, "Stake not found"
-    return stake_info
+    return resolve_stake_time(stake_info)
 
 @export
 def calculate_rewards(pool_id: str, staker: str):
@@ -419,31 +465,35 @@ def calculate_rewards(pool_id: str, staker: str):
     stake_info = stakes[pool_id, staker]
     assert stake_info is not None, "Not staking in this pool"
     
-    current_time = now
-    time_staked = current_time - stake_info["start_time"]
-    is_early = time_staked.seconds < pool["lock_duration"]
+    stake_info = resolve_stake_time(stake_info)
+    activation_pending = stake_info["start_time"] is None
+    time_staked = 0
+    if not activation_pending:
+        time_staked = elapsed_stake_seconds(stake_info)
+    is_early = time_staked < pool["lock_duration"]
     
     # Calculate potential rewards
     max_reward = stake_info["reserved_reward"]
     
     if is_early:
-        current_reward = max_reward * time_staked.seconds / pool["lock_duration"]
+        current_reward = max_reward * time_staked / pool["lock_duration"]
     else:
         current_reward = max_reward
     
     # Calculate potential penalty
     penalty = 0.0
     if is_early and pool["penalty_rate"] > 0.0:
-        time_remaining = pool["lock_duration"] - time_staked.seconds
+        time_remaining = pool["lock_duration"] - time_staked
         penalty_factor = time_remaining / pool["lock_duration"]
         penalty = stake_info["amount"] * pool["penalty_rate"] * penalty_factor
     
     return {
+        "activation_pending": activation_pending,
         "current_reward": current_reward,
         "max_reward": max_reward,
         "potential_penalty": penalty,
-        "time_staked": time_staked.seconds,
-        "time_remaining": max(0, pool["lock_duration"] - time_staked.seconds),
+        "time_staked": time_staked,
+        "time_remaining": max(0, pool["lock_duration"] - time_staked),
         "is_early": is_early
     }
 

@@ -3,8 +3,8 @@
   "schema_version": 1,
   "name": "nameservice",
   "display_name": "Nameservice",
-  "version": "0.2.0",
-  "description": "Renewable on-chain name registry with primary-name mapping and arbitrary record data.",
+  "version": "0.3.0",
+  "description": "Successor-checkpoint renewable names; requires canonical time_checkpoints v1 and its node keeper.",
   "source": {
     "repo": "https://github.com/xian-technology/xian-contracts"
   },
@@ -13,8 +13,17 @@
       "name": "con_nameservice",
       "role": "registry",
       "path": "src/con_nameservice.py",
-      "sha256": "03a5d73ab5cd0c98a405826e67faf9ac9dcfbb7551541e890767ecc116cfb49c",
-      "deploy_order": 10
+      "sha256": "502c1c5a949b44b5fb05c5f6d7e1e35ae7b83d9fb89a29379531eccaaf69c3d0",
+      "deploy_order": 10,
+      "metadata": {
+        "platform_dependencies": [
+          {
+            "contract": "time_checkpoints",
+            "protocol_version": 1,
+            "keeper_required": true
+          }
+        ]
+      }
     }
   ]
 }

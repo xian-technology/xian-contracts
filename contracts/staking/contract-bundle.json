@@ -3,8 +3,8 @@
   "schema_version": 1,
   "name": "staking",
   "display_name": "Staking",
-  "version": "0.2.0",
-  "description": "Annualized multi-pool staking with funded rewards, custody liabilities, and excess-only recovery.",
+  "version": "0.3.0",
+  "description": "Successor-checkpoint annualized staking; requires canonical time_checkpoints v1 and its node keeper.",
   "source": {
     "repo": "https://github.com/xian-technology/xian-contracts"
   },
@@ -13,8 +13,17 @@
       "name": "con_staking",
       "role": "staking",
       "path": "src/con_staking.py",
-      "sha256": "227649da05677be110fe8cbb8b6570e58541778783cdb9489d6024e568b2171a",
-      "deploy_order": 10
+      "sha256": "9b719cf923d23b852e53832566bdf43b5c08bc4c2d6375fba25be5e0a03a2e37",
+      "deploy_order": 10,
+      "metadata": {
+        "platform_dependencies": [
+          {
+            "contract": "time_checkpoints",
+            "protocol_version": 1,
+            "keeper_required": true
+          }
+        ]
+      }
     }
   ]
 }

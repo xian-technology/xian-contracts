@@ -3,6 +3,8 @@ from pathlib import Path
 import pytest
 from contracting.local import ContractingClient
 
+from conftest import deploy_time_checkpoints
+
 TOKEN = """
 balances = Hash(default_value=0)
 received_bps = Variable()
@@ -28,6 +30,7 @@ def transfer_from(amount: decimal, to: str, main_account: str):
 
 def setup_pool(tmp_path, purpose, received_bps):
     client = ContractingClient(storage_home=tmp_path)
+    deploy_time_checkpoints(client)
     client.submit(TOKEN, name="con_plain")
     client.submit(TOKEN, name="con_taxed", constructor_args={"received_bps_value": received_bps})
     client.submit(
@@ -51,9 +54,11 @@ def setup_pool(tmp_path, purpose, received_bps):
 
 def fund(staking, pool, purpose):
     if purpose == "rewards":
-        staking.deposit_rewards(pool_id=pool, amount=100, signer="alice")
+        staking.deposit_rewards(
+            pool_id=pool, amount=100, signer="alice", environment={"block_num": 2}
+        )
     else:
-        staking.stake(pool_id=pool, signer="alice")
+        staking.stake(pool_id=pool, signer="alice", environment={"block_num": 100})
 
 
 @pytest.mark.parametrize("purpose", ["principal", "rewards", "entry_fee"])
@@ -63,6 +68,12 @@ def test_staking_liabilities_cannot_exceed_received_funding(tmp_path, purpose, r
     token = client.get_contract_proxy("con_taxed")
     with pytest.raises(AssertionError, match="exact token transfer"):
         fund(staking, pool, purpose)
+    assert (
+        client.raw_driver.get(
+            f"time_checkpoints.pending_heights:{2 if purpose == 'rewards' else 100}"
+        )
+        is None
+    )
     assert staking.get_token_liability(token_contract="con_taxed")["total"] == 0
     assert token.balance_of(address="con_staking") == 0
     assert token.balance_of(address="alice") == 1000
@@ -97,4 +108,4 @@ def test_staking_rejects_unreadable_funding_token_before_transfer(tmp_path):
         signer="alice",
     )
     with pytest.raises(AssertionError, match="must export balance_of"):
-        staking.stake(pool_id=pool, signer="alice")
+        staking.stake(pool_id=pool, signer="alice", environment={"block_num": 100})
