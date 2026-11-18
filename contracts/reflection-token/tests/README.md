@@ -8,6 +8,12 @@ Current coverage includes:
 - exclusion preserving balances
 - excluded DEX pool accounting under fee-bearing transfers
 - include/exclude round-trips
+- balance conservation for every holder across repeated reward-status changes
+  and a seeded sequence of mixed transfers
+- rejection and atomic rollback of reflection fees without a remaining eligible
+  holder or with an unrepresentable reward rate
+- rejection of zero-reflected-debit transfers, including delegated transfers
+  and preservation of allowances
 - approval and `transfer_from` fee behavior
 - XSC001 interface compatibility
 - metadata getter, operator rotation, and total-supply metadata sync

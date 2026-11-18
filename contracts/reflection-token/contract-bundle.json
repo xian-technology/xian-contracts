@@ -3,7 +3,7 @@
   "schema_version": 1,
   "name": "reflection-token",
   "display_name": "Reflection Token",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Fee-on-transfer reflection token designed to work with the Xian DEX.",
   "source": {
     "repo": "https://github.com/xian-technology/xian-contracts"
@@ -13,7 +13,7 @@
       "name": "con_reflection_token",
       "role": "token",
       "path": "src/con_reflection_token.py",
-      "sha256": "54557a4064c6eca279aca9526f49dff1b1d47ac65044fcaacb9e227bff3d22fc",
+      "sha256": "be085b99bd47eb9f8c104f1ccb9662ee1934c6ae4cc981d9e39689aecbea1186",
       "deploy_order": 10
     }
   ]

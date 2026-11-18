@@ -174,6 +174,7 @@ def move_tokens(sender: str, recipient: str, amount, charge_fees: bool):
 
     rate = get_rate()
     reflected_amount = amount_value * rate
+    assert reflected_amount > ZERO, 'Transfer amount below reflected precision!'
 
     if excluded[sender]:
         decrease_excluded_balance(sender, amount_value, reflected_amount)
@@ -220,6 +221,11 @@ def move_tokens(sender: str, recipient: str, amount, charge_fees: bool):
             - reflected_burn_amount
             - reflected_reflection_amount
         )
+        if reflection_amount > ZERO:
+            assert (
+                to_decimal(r_total.get()) > to_decimal(reward_excluded_r_total.get())
+                and get_rate() > ZERO
+            ), 'Reflection fee requires a reward-eligible balance!'
         sync_total_supply_metadata()
 
     TransferEvent(
@@ -422,6 +428,11 @@ def include_in_rewards(address: str):
 
     token_amount = to_decimal(t_balances[address])
     reflected_balance = to_decimal(excluded_r_balances[address])
+    # Rebase at the participating holders' rate, before changing its basis.
+    included_reflected_balance = token_amount * get_rate()
+    r_total.set(
+        to_decimal(r_total.get()) + included_reflected_balance - reflected_balance
+    )
 
     if counts_toward_rewards(address):
         reward_excluded_t_total.set(
@@ -434,7 +445,7 @@ def include_in_rewards(address: str):
     excluded[address] = False
     t_balances[address] = ZERO
     excluded_r_balances[address] = ZERO
-    balances[address] = token_amount * get_rate()
+    balances[address] = included_reflected_balance
 
     RewardStatusChangedEvent(
         {

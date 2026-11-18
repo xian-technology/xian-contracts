@@ -22,6 +22,13 @@ Fee-on-transfer reflection token designed to work with the Xian DEX.
 - Excluding pool addresses from rewards is part of the normal setup.
 - Excluded balances are tracked explicitly so excluded pools do not distort the
   reflection rate basis.
+- Including an excluded holder preserves its balance and the participating
+  holders' reflection rate, subject to decimal rounding.
+- A transfer with a nonzero reflection fee requires a remaining reward-eligible
+  balance and a representable positive reflection rate. Otherwise the entire
+  call fails, preserving balances, supply, allowances, and events. In particular,
+  the sole holder cannot deposit its entire balance into an excluded fee-target
+  pool; retain a reward-eligible balance when providing initial liquidity.
 - The package tests use `con_pairs` as the fee target and
   reward-excluded pool address. Under that model, transfers into the pair are
   taxed too, so adding liquidity with the reflection token side also deposits a
@@ -51,7 +58,10 @@ flowchart LR
   Helper["con_dex_helper"] --> Router
 ```
 
-Transfers and allowances accept `decimal` amounts. The reflected balance quotient truncates to 30 fractional places.
+Transfers and allowances accept `decimal` amounts. Reflected arithmetic and
+balance quotients truncate to 30 fractional places. Transfers whose reflected
+debit rounds to zero fail instead of crediting tokens without a debit; the
+minimum transferable amount therefore depends on the current reflection rate.
 
 
 ## Account Identifiers
