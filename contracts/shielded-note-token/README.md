@@ -31,6 +31,8 @@ The contract exposes:
 - shielded flows: `deposit_shielded`, `transfer_shielded`,
   `withdraw_shielded`
 - admin/configuration: `configure_vk`, `change_operator`
+- relayed transfer: `relay_transfer_shielded`, bound to `shielded_command_v5`
+  (statement version `5`)
 - proof/runtime introspection: `asset_id`, `zero_shielded_root`,
   `current_shielded_root`, `get_proof_config`, `get_tree_state`,
   `get_note_count`, `get_note_commitment`, `get_note_payload`,
@@ -74,7 +76,7 @@ flowchart LR
 - Shielded outputs are addressed to `owner_public`, so a sender only needs the
   recipient's public shielded address, not the recipient's spending secret.
 - The contract can persist optional encrypted note payloads alongside output
-  commitments. The `v3` statement binds per-output payload hashes into the proof
+  commitments. The version-`4` statement binds per-output payload hashes into the proof
   so the on-chain payload bytes cannot drift from the proving statement after
   the fact.
 - Wallet-side key material is split between a spend key (`owner_secret`)
@@ -86,7 +88,7 @@ flowchart LR
 - Public balances and shielded supply are tracked separately while keeping a
   total-supply invariant.
 - Proof-related field values use canonical BN254 field-element encodings.
-- The shielded circuit family is `v3`, built around Merkle auth paths
+- The shielded circuit family is `shielded_note_v4` (statement version `4`), built around Merkle auth paths
   plus a chain-owned append frontier rather than whole-tree witnesses.
 - The default tree depth is `20`, giving a capacity of `1,048,576` notes
   while keeping verifier cost flat and append updates `O(depth)`.

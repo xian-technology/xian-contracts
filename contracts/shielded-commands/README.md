@@ -16,7 +16,7 @@ Proof-backed shielded command pool for anonymous relayed contract execution.
 - Public tokens are escrowed in the contract and represented as shielded notes.
 - `deposit_shielded` and `withdraw_shielded` use Groth16 proofs plus accepted
   roots, spent nullifiers, and note commitments.
-- `execute_command` spends one hidden note, binds the proof to an exact
+- `execute_command` spends up to four hidden notes, binds the proof to an exact
   relayer/target/payload/expiry/public-spend tuple, pays the relayer fee from
   escrow, and optionally emits hidden change notes.
 - Commands can authorize a proof-bound `public_amount` budget. Allowlisted
@@ -27,7 +27,7 @@ Proof-backed shielded command pool for anonymous relayed contract execution.
   invalidating the command.
 - Executed commands target a fixed exported `interact(payload: dict)`
   entrypoint so the executor stays compatible with Xian contract constraints.
-- The configured circuit family is `shielded_command_v4`, and keys are
+- The configured circuit family is `shielded_command_v5` (statement version `5`), and keys are
   expected to carry matching registry metadata for family, statement version,
   tree depth, and IO bounds.
 - The contract requires exact per-operation token transfer deltas, so
