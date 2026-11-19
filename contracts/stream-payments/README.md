@@ -54,7 +54,11 @@ The streamed token contract must expose:
 The contract validates that interface before using the token.
 It verifies the exact escrow balance increase before creating a stream, so
 fee-on-transfer and no-op funding cannot leave promises backed by other streams'
-assets. Receivers that are 64-character hexadecimal account keys must use
+assets. Claims and refunds verify the exact debit from escrow and the exact
+credit to the recipient. The contract records a claim before calling the token.
+If settlement fails, the claim and token transfer roll back together.
+The stream escrow contract cannot be its own receiver. Receivers that are
+64-character hexadecimal account keys must use
 lowercase; named destinations retain their exact spelling. Permit parameters
 are validated without silently changing their signed values.
 

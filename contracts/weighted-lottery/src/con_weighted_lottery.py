@@ -103,6 +103,20 @@ def require_token_contract(token_contract: str):
     assert importlib.has_export(token_contract, "transfer_from"), (
         "token contract must export transfer_from."
     )
+    assert importlib.has_export(token_contract, "balance_of"), (
+        "token contract must export balance_of."
+    )
+
+
+def pay_from_escrow(token_contract: str, amount: decimal, recipient: str):
+    token = importlib.import_module(token_contract)
+    escrow_before = token.balance_of(address=ctx.this) or 0
+    recipient_before = token.balance_of(address=recipient) or 0
+    token.transfer(amount=amount, to=recipient)
+    assert (
+        (token.balance_of(address=ctx.this) or 0) == escrow_before - amount
+        and token.balance_of(address=recipient) == recipient_before + amount
+    ), "Lottery requires an exact escrow payout."
 
 
 def initial_entropy(lottery_id: int, creator: str, token_contract: str, ticket_price, close_at, metadata_uri: str):
@@ -237,7 +251,11 @@ def buy_tickets(lottery_id: int, ticket_count: int, buyer_entropy: str = ""):
     amount = lotteries[lottery_id, "ticket_price"] * ticket_count
     token_contract = lotteries[lottery_id, "token_contract"]
     token = importlib.import_module(token_contract)
+    escrow_before = token.balance_of(address=ctx.this) or 0
     token.transfer_from(amount=amount, to=ctx.this, main_account=ctx.caller)
+    assert token.balance_of(address=ctx.this) == escrow_before + amount, (
+        "Lottery requires an exact escrow transfer."
+    )
 
     if entries[lottery_id, ctx.caller] == 0:
         entrants = lotteries[lottery_id, "entrants"] or []
@@ -316,12 +334,10 @@ def claim_refund(lottery_id: int):
     )
     lotteries[lottery_id, "updated_at"] = now
 
-    token = importlib.import_module(lotteries[lottery_id, "token_contract"])
-    token.transfer(amount=amount, to=ctx.caller)
-
     if lotteries[lottery_id, "refunded_tickets"] == lotteries[lottery_id, "total_tickets"]:
         lotteries[lottery_id, "status"] = STATUS_CANCELLED
 
+    pay_from_escrow(lotteries[lottery_id, "token_contract"], amount, ctx.caller)
     LotteryRefundedEvent(
         {"lottery_id": lottery_id, "account": ctx.caller, "amount": amount}
     )
@@ -358,10 +374,6 @@ def draw_winner(lottery_id: int):
 
     assert winner is not None, "Unable to select winner."
 
-    token_contract = lotteries[lottery_id, "token_contract"]
-    token = importlib.import_module(token_contract)
-    token.transfer(amount=lotteries[lottery_id, "pot_amount"], to=winner)
-
     lotteries[lottery_id, "status"] = STATUS_DRAWN
     lotteries[lottery_id, "winner"] = winner
     lotteries[lottery_id, "winning_ticket"] = winning_ticket
@@ -369,6 +381,9 @@ def draw_winner(lottery_id: int):
     lotteries[lottery_id, "drawn_at"] = now
     lotteries[lottery_id, "updated_at"] = now
 
+    pay_from_escrow(
+        lotteries[lottery_id, "token_contract"], lotteries[lottery_id, "pot_amount"], winner
+    )
     LotteryDrawnEvent(
         {
             "lottery_id": lottery_id,

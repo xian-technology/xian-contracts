@@ -160,6 +160,17 @@ def require_token(token_contract: str):
     return importlib.import_module(token_contract)
 
 
+def pay_from_escrow(token_contract: str, amount: decimal, recipient: str):
+    token = require_token(token_contract)
+    escrow_before = token.balance_of(address=ctx.this) or 0
+    recipient_before = token.balance_of(address=recipient) or 0
+    token.transfer(amount=amount, to=recipient)
+    assert (
+        (token.balance_of(address=ctx.this) or 0) == escrow_before - amount
+        and token.balance_of(address=recipient) == recipient_before + amount
+    ), "Stream requires an exact escrow payout."
+
+
 def stream_id_for(sender: str, receiver: str, token_contract: str, begins, closes, rate):
     nonce = sender_nonces[sender]
     return hashlib.sha3_text(
@@ -188,6 +199,7 @@ def perform_create_stream(
     rate_value = to_decimal(rate)
 
     require_receiver(receiver)
+    assert receiver != ctx.this, "Receiver cannot be the stream escrow contract."
     assert sender != receiver, "Sender and receiver must be different."
     assert begins < closes, "Stream cannot begin after the close date."
     assert rate_value > ZERO, "Rate must be greater than zero."
@@ -249,7 +261,6 @@ def shorten_stream_internal(stream_id: str, requested_close):
     current_close = streams[stream_id, CLOSE_KEY]
     begins = streams[stream_id, BEGIN_KEY]
     sender = streams[stream_id, SENDER_KEY]
-    token = require_token(streams[stream_id, TOKEN_KEY])
 
     assert requested_close <= current_close, (
         "Stream close time cannot be extended. Create a new stream instead."
@@ -269,7 +280,7 @@ def shorten_stream_internal(stream_id: str, requested_close):
     streams[stream_id, DEPOSIT_KEY] = new_deposit
 
     if refund > ZERO:
-        token.transfer(amount=refund, to=sender)
+        pay_from_escrow(streams[stream_id, TOKEN_KEY], refund, sender)
 
     return current_close, new_close, refund
 
@@ -280,10 +291,8 @@ def payout_claimable_amount(stream_id: str):
         return ZERO
 
     receiver = streams[stream_id, RECEIVER_KEY]
-    token = require_token(streams[stream_id, TOKEN_KEY])
-
-    token.transfer(amount=amount, to=receiver)
     streams[stream_id, CLAIMED_KEY] = to_decimal(streams[stream_id, CLAIMED_KEY]) + amount
+    pay_from_escrow(streams[stream_id, TOKEN_KEY], amount, receiver)
 
     StreamBalancedEvent(
         {

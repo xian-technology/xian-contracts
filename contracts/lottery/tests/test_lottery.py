@@ -1,9 +1,7 @@
-from pathlib import Path
-
 from contracting.local import ContractingClient
 from xian_runtime_types.decimal import ContractingDecimal
 
-CONTRACTS = Path(__file__).resolve().parents[2]
+from conftest import catalog_source
 
 
 def test_fractional_prize_reaches_only_registered_player(tmp_path):
@@ -12,7 +10,7 @@ def test_fractional_prize_reaches_only_registered_player(tmp_path):
             ("reflection-token", "con_reflection_token"),
             ("lottery", "con_lottery"),
         ):
-            client.submit((CONTRACTS / package / "src" / f"{name}.py").read_text(), name=name)
+            client.submit(catalog_source(package, f"{name}.py").read_text(), name=name)
         token = client.get_contract_proxy("con_reflection_token")
         lottery = client.get_contract_proxy("con_lottery")
         prize = ContractingDecimal("1.250000000000000000000000000001")

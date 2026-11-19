@@ -3,7 +3,7 @@
   "schema_version": 1,
   "name": "stream-payments",
   "display_name": "Stream Payments",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Standalone escrowed token-stream contract extracted from legacy XSC003-style logic.",
   "source": {
     "repo": "https://github.com/xian-technology/xian-contracts"
@@ -13,7 +13,7 @@
       "name": "con_stream_payments",
       "role": "streaming",
       "path": "src/con_stream_payments.py",
-      "sha256": "64d3f506c81f3ed0ad95e6c82b11f725b59ea3c3503f8b3ddd9f0db7586751ff",
+      "sha256": "64294736a9106447738ad1b51b5334c79702e7c1ed38dccda2579fdcb4e26b74",
       "deploy_order": 10
     }
   ]
