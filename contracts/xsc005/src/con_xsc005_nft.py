@@ -1005,11 +1005,12 @@ def buy(token_id: str):
         seller_amount = price
         royalty_amount = ZERO
 
-    payment_token.transfer_from(
-        amount=seller_amount,
-        to=seller,
-        main_account=buyer,
-    )
+    if seller_amount > ZERO:
+        payment_token.transfer_from(
+            amount=seller_amount,
+            to=seller,
+            main_account=buyer,
+        )
 
     transfer_internal(token_id, seller, buyer)
     TokenSaleEvent(

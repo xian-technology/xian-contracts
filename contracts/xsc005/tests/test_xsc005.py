@@ -1,13 +1,13 @@
 import hashlib
 import unittest
-from pathlib import Path
 
 from contracting.local import ContractingClient
 from xian_runtime_types.decimal import ContractingDecimal
 
-ROOT = Path(__file__).resolve().parents[1]
-CHECKER_PATH = ROOT / "src" / "con_xsc005.py"
-REFERENCE_PATH = ROOT / "src" / "con_xsc005_nft.py"
+from conftest import catalog_source
+
+CHECKER_PATH = catalog_source("xsc005", "con_xsc005.py")
+REFERENCE_PATH = catalog_source("xsc005", "con_xsc005_nft.py")
 
 PAYMENT_TOKEN = """
 balances = Hash(default_value=0)
@@ -374,6 +374,22 @@ class TestXSC005(unittest.TestCase):
         self.assertEqual(self.nft.owner_of(token_id="pixel-1"), self.bob)
         self.assertEqual(self.currency.balance_of(address=self.alice), 95)
         self.assertEqual(self.currency.balance_of(address=self.creator), 999005)
+        self.assertEqual(self.currency.balance_of(address=self.bob), 900)
+        self.assertEqual(self.nft.listing_info(token_id="pixel-1")["seller"], "")
+
+    def test_marketplace_purchase_with_full_royalty(self):
+        self.mint_inline(royalty_bps=10000)
+        self.currency.transfer(amount=1000, to=self.bob, signer=self.operator)
+        self.currency.approve(amount=100, to="con_xsc005_nft", signer=self.bob)
+        self.nft.list_for_sale(
+            token_id="pixel-1", currency_contract="currency", price=100, signer=self.alice
+        )
+
+        self.nft.buy(token_id="pixel-1", signer=self.bob)
+
+        self.assertEqual(self.nft.owner_of(token_id="pixel-1"), self.bob)
+        self.assertEqual(self.currency.balance_of(address=self.alice), 0)
+        self.assertEqual(self.currency.balance_of(address=self.creator), 999100)
         self.assertEqual(self.currency.balance_of(address=self.bob), 900)
         self.assertEqual(self.nft.listing_info(token_id="pixel-1")["seller"], "")
 

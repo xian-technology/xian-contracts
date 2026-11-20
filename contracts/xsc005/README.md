@@ -63,6 +63,8 @@ NFT surface. The reference marketplace accepts only the seeded chain
 are rejected because interface shape alone cannot prove value transfer.
 
 Listing and sale prices use `decimal`. Multiply a sale price by the exact basis-point rate to compute the royalty. The payout truncates to 30 fractional places, and the seller receives the balance of the price.
+At a 100% royalty, a royalty recipient distinct from the seller receives the
+full sale price and there is no seller payment.
 
 
 ## Account Identifiers
