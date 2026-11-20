@@ -97,6 +97,17 @@ def receive_tokens(token_contract: str, amount: decimal):
     assert token.balance_of(address=ctx.this) == balance_before + amount, "Staking requires an exact token transfer."
 
 
+def pay_from_escrow(token_contract: str, amount: decimal, recipient: str):
+    token = importlib.import_module(token_contract)
+    escrow_before = token.balance_of(address=ctx.this) or 0
+    recipient_before = token.balance_of(address=recipient) or 0
+    token.transfer(amount=amount, to=recipient)
+    assert (
+        (token.balance_of(address=ctx.this) or 0) == escrow_before - amount
+        and token.balance_of(address=recipient) == recipient_before + amount
+    ), "Staking requires an exact escrow payout."
+
+
 def max_reward_for_pool(pool):
     return annualized_reward(
         pool["stake_amount"],
@@ -379,11 +390,9 @@ def unstake(pool_id: str):
 
     # Transfer stake tokens back (minus penalty) and rewards.
     if stake_return > 0.0:
-        stake_token = importlib.import_module(pool["stake_token"])
-        stake_token.transfer(amount=stake_return, to=ctx.caller)
+        pay_from_escrow(pool["stake_token"], stake_return, ctx.caller)
     if reward_earned > 0.0:
-        reward_token = importlib.import_module(pool["reward_token"])
-        reward_token.transfer(amount=reward_earned, to=ctx.caller)
+        pay_from_escrow(pool["reward_token"], reward_earned, ctx.caller)
     
     UnstakeEvent({
         "pool_id": pool_id,
@@ -433,11 +442,9 @@ def withdraw_creator_fees(pool_id: str):
 
     # Withdraw entry fees and penalties (in stake token).
     if total_fees > 0.0 and pool["entry_fee_token"] is not None:
-        fee_token = importlib.import_module(pool["entry_fee_token"])
-        fee_token.transfer(amount=total_fees, to=ctx.caller)
+        pay_from_escrow(pool["entry_fee_token"], total_fees, ctx.caller)
     if total_penalties > 0.0:
-        stake_token = importlib.import_module(pool["stake_token"])
-        stake_token.transfer(amount=total_penalties, to=ctx.caller)
+        pay_from_escrow(pool["stake_token"], total_penalties, ctx.caller)
 
 @export
 def get_pool_info(pool_id: str):
@@ -518,7 +525,7 @@ def emergency_withdraw_token(token_contract: str, amount: decimal):
     balance = token.balance_of(address=ctx.this)
     recoverable = balance - total_liability_for_token(token_contract)
     assert recoverable >= amount, "Amount exceeds recoverable excess"
-    token.transfer(amount=amount, to=ctx.caller)
+    pay_from_escrow(token_contract, amount, ctx.caller)
 
 
 @export

@@ -1,10 +1,8 @@
-from pathlib import Path
-
 import pytest
 from contracting.local import ContractingClient
 from xian_runtime_types.time import Datetime
 
-from conftest import checkpoint_time, deploy_time_checkpoints
+from conftest import catalog_source, checkpoint_time, deploy_time_checkpoints
 
 START = Datetime(2026, 1, 1)
 MATURE = Datetime(2027, 1, 1)
@@ -124,7 +122,7 @@ def system(tmp_path):
     client = ContractingClient(storage_home=tmp_path)
     deploy_time_checkpoints(client)
     client.submit(
-        (Path(__file__).absolute().parents[1] / "src" / "con_staking.py").read_text(),
+        catalog_source("staking", "con_staking.py").read_text(),
         name="con_staking",
     )
     for name in ["con_principal", "con_reward", "con_fee"]:

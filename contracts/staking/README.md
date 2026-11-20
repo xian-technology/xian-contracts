@@ -14,7 +14,7 @@ controls.
 
 ## Required Platform Service
 
-Bundle `0.3.0` requires the canonical immutable `time_checkpoints` contract,
+Bundle `0.3.1` requires the canonical immutable `time_checkpoints` contract,
 protocol version 1, and its compatible node keeper. Deploying source alone does
 not provide the keeper. New principal and reward funding fail before custody
 when that service is missing, incompatible, or not ready. Financial calls
@@ -82,7 +82,9 @@ are therefore the only balances eligible for emergency recovery.
 Settlement updates positions, pool reservations/statistics, and token liabilities
 before any outgoing token call. Contract-owned positions and creator accounts
 therefore settle once even when a token invokes another contract during payout.
-A failed payout reverts the entire settlement, including both asset transfers.
+Each payout, including excess recovery, must release the exact amount from
+escrow and credit the same amount to the recipient. A short or excess transfer
+reverts the entire settlement, including earlier transfers in the call.
 
 ## Workflow
 
