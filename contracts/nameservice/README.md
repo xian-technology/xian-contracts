@@ -14,7 +14,7 @@ data.
 
 ## Required Platform Service
 
-Bundle `0.3.0` requires the canonical immutable `time_checkpoints` contract,
+Bundle `0.3.1` requires the canonical immutable `time_checkpoints` contract,
 protocol version 1, and a compatible node keeper. Minting and renewal verify
 that dependency and internally capture the current positive block height
 before accepting payment. Source-only deployment does not install the keeper;
@@ -45,8 +45,8 @@ is for fresh deployments, not an in-place conversion of `0.2.0` lease state.
   overflow into an available or silently nonexpiring name.
 - The manager controls pricing, registration period, contract allowlist, and
   whether the registry is enabled.
-- Hex public-key recipients and replacement managers must use canonical
-  lowercase spelling. Mixed-case hex keys cannot receive spendable ownership;
+- Transfer recipients, approval destinations, and replacement managers must
+  be nonempty. Hex public keys must use canonical lowercase spelling, and
   named contract accounts retain their exact spelling.
 - Contract callers whose names start with `con_` must be explicitly allowlisted
   to interact with the registry.

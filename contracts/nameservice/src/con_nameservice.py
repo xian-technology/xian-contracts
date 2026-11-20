@@ -72,7 +72,8 @@ def effective_expiry(name: str):
     return anchor + datetime.timedelta(days=lease_period_days[name])
 
 
-def require_canonical_hex_account(account: str):
+def require_account(account: str):
+    assert account != "", "Account must be non-empty."
     if len(account) != 64 or account == account.lower():
         return
     for character in account:
@@ -153,7 +154,7 @@ def mint_name(name: str):
 
 @export
 def transfer(name: str, to: str):
-    require_canonical_hex_account(to)
+    require_account(to)
     assert_is_not_expired(name)
     assert to != ctx.caller, "You cannot transfer to yourself"
     assert name != "", "Please specify the Name you want to transfer"
@@ -172,7 +173,7 @@ def transfer(name: str, to: str):
 
 @export
 def approve(name: str, to: str):
-    require_canonical_hex_account(to)
+    require_account(to)
     assert_is_not_expired(name)
     assert_is_owner(ctx.caller, name)
     approvals[ctx.caller, to, name] = 1
@@ -188,7 +189,7 @@ def revoke_approval(name: str, to: str):
 
 @export
 def transfer_from(name: str, to: str, main_account: str):
-    require_canonical_hex_account(to)
+    require_account(to)
     assert_if_contract_is_approved(ctx.caller)
     assert to != main_account, "You cannot transfer to yourself"
     assert name != "", "Please specify the Name you want to transfer"
@@ -301,7 +302,7 @@ def set_royalty_fee_percentage(percentage: int):
 @export
 def set_manager(new_manager: str):
     assert_is_manager()
-    require_canonical_hex_account(new_manager)
+    require_account(new_manager)
     manager.set(new_manager)
 
 

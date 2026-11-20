@@ -94,6 +94,30 @@ class TestNameservice(unittest.TestCase):
             self.nameservice.set_manager(new_manager="B" * 64, signer=self.manager)
         self.nameservice.set_enabled(state=False, signer=self.manager)
 
+    def test_empty_account_is_rejected_for_name_delivery_and_manager_rotation(self):
+        env = {"now": Datetime(2026, 1, 1)}
+        self.mint_and_checkpoint(name="alice123", signer=self.alice, environment=env)
+        self.nameservice.set_main_name_to_caller(
+            name="alice123", signer=self.alice, environment=env
+        )
+        expiry = self.nameservice.get_expiry_time(name="alice123", environment=env)
+        for method, extra in (
+            (self.nameservice.transfer, {}),
+            (self.nameservice.approve, {}),
+            (self.nameservice.transfer_from, {"main_account": self.alice}),
+        ):
+            with self.assertRaisesRegex(AssertionError, "non-empty"):
+                method(name="alice123", to="", signer=self.alice, environment=env, **extra)
+        self.assertEqual(self.nameservice.get_owner(name="alice123", environment=env), self.alice)
+        self.assertEqual(self.nameservice.get_expiry_time(name="alice123", environment=env), expiry)
+        self.assertEqual(
+            self.nameservice.get_address_to_main_name(address=self.alice, environment=env),
+            "alice123",
+        )
+        with self.assertRaisesRegex(AssertionError, "non-empty"):
+            self.nameservice.set_manager(new_manager="", signer=self.manager)
+        self.nameservice.set_enabled(state=False, signer=self.manager)
+
     def test_named_contracts_remain_valid_transfer_and_manager_targets(self):
         env = {"now": Datetime(2026, 1, 1)}
         self.mint_and_checkpoint(name="alice123", signer=self.alice, environment=env)
