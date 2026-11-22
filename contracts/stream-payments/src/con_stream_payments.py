@@ -266,7 +266,7 @@ def shorten_stream_internal(stream_id: str, requested_close):
         "Stream close time cannot be extended. Create a new stream instead."
     )
 
-    new_close = effective_close_for_request(begins, requested_close)
+    new_close = min(current_close, effective_close_for_request(begins, requested_close))
     current_deposit = to_decimal(streams[stream_id, DEPOSIT_KEY])
     claimed = to_decimal(streams[stream_id, CLAIMED_KEY])
     rate = to_decimal(streams[stream_id, RATE_KEY])
@@ -460,7 +460,9 @@ def finalize_stream(stream_id: str):
 
 @export
 def close_balance_finalize(stream_id: str):
-    change_close_time(stream_id=stream_id, new_close_time=str(now))
+    closes = streams[stream_id, CLOSE_KEY]
+    requested_close = min(now, closes) if closes is not None else now
+    change_close_time(stream_id=stream_id, new_close_time=str(requested_close))
     balance_finalize(stream_id=stream_id)
 
 

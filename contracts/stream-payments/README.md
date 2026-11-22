@@ -66,6 +66,8 @@ are validated without silently changing their signed values.
 
 - `change_close_time(...)` only supports shortening or immediate close. It does
   not support extending a stream in place.
+- `close_balance_finalize(...)` settles an already-ended stream through its
+  existing close time.
 - `create_stream_from_permit(...)` authorizes the stream parameters, but the
   sender must approve `con_stream_payments` on the token
   contract for the escrow transfer to succeed.

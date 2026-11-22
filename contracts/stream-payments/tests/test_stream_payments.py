@@ -186,6 +186,39 @@ class TestStreamPayments(unittest.TestCase):
             "finalized",
         )
 
+    def test_close_balance_finalize_settles_already_ended_stream(self):
+        begins = ts(2026, 1, 1, 0, 0, 0)
+        closes = ts(2026, 1, 1, 0, 0, 10)
+        stream_id = self.create_stream(begins=begins, closes=closes, rate=2)
+
+        self.streams.close_balance_finalize(
+            stream_id=stream_id,
+            signer=self.alice,
+            environment={"now": Datetime(2026, 1, 1, 0, 0, 12)},
+        )
+
+        info = self.streams.stream_info(stream_id=stream_id)
+        self.assertEqual(info["closes"], closes)
+        self.assertEqual(info["status"], "finalized")
+        self.assertEqual(self.token.balance_of(address=self.bob), 20)
+        self.assertEqual(self.token.balance_of(address="con_stream_payments"), 0)
+
+    def test_change_close_time_preserves_ended_stream_budget(self):
+        begins = ts(2026, 1, 1, 0, 0, 0)
+        closes = ts(2026, 1, 1, 0, 0, 10)
+        stream_id = self.create_stream(begins=begins, closes=closes, rate=2)
+
+        effective_close = self.streams.change_close_time(
+            stream_id=stream_id,
+            new_close_time=closes,
+            signer=self.alice,
+            environment={"now": Datetime(2026, 1, 1, 0, 0, 12)},
+        )
+
+        self.assertEqual(effective_close, closes)
+        self.assertEqual(self.streams.stream_info(stream_id=stream_id)["deposit"], 20)
+        self.assertEqual(self.token.balance_of(address="con_stream_payments"), 20)
+
     def test_forfeit_stream_refunds_future_and_pays_accrued(self):
         begins = ts(2026, 1, 1, 0, 0, 0)
         closes = ts(2026, 1, 1, 0, 0, 10)
