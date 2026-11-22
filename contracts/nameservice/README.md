@@ -48,8 +48,9 @@ is for fresh deployments, not an in-place conversion of `0.2.0` lease state.
 - Transfer recipients, approval destinations, and replacement managers must
   be nonempty. Hex public keys must use canonical lowercase spelling, and
   named contract accounts retain their exact spelling.
-- Contract callers whose names start with `con_` must be explicitly allowlisted
-  to interact with the registry.
+- Callers whose names start with `con_` need an explicit allowlist entry to
+  register a name or deliver an approved transfer. The prefix applies to the
+  start of the caller name. Existing ownership and approval checks still apply.
 
 ## Validation
 

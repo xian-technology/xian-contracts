@@ -90,7 +90,7 @@ def assert_is_owner(address: str, name: str):
 
 
 def assert_if_contract_is_approved(contract: str):
-    if "con_" in contract:
+    if contract.startswith("con_"):
         assert contract in contracts_allowlist.get(), "This contract is not allowed to interact with this contract"
 
 

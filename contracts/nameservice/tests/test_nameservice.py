@@ -89,6 +89,30 @@ class TestNameservice(unittest.TestCase):
             )
         self.assertEqual(self.nameservice.get_owner(name="alice123", environment=env), self.alice)
 
+    def test_delegated_delivery_allowlist_matches_the_contract_prefix(self):
+        source = (
+            "import con_nameservice\n\n"
+            "@export\ndef deliver(name: str, to: str, account: str):\n"
+            "    con_nameservice.transfer_from(name=name, to=to, main_account=account)\n"
+        )
+        self.client.submit(source, name="con_helper")
+        self.client.submit(source, name="system_con_helper")
+        prefixed = self.client.get_contract_proxy("con_helper")
+        system = self.client.get_contract_proxy("system_con_helper")
+        env = {"now": Datetime(2026, 1, 1)}
+        recipient = "b" * 64
+        for name in ("first123", "second123"):
+            self.mint_and_checkpoint(name=name, signer=self.alice, environment=env)
+            self.nameservice.approve(name=name, to=recipient, signer=self.alice, environment=env)
+
+        with self.assertRaisesRegex(AssertionError, "not allowed"):
+            prefixed.deliver(name="first123", to=recipient, account=self.alice, environment=env)
+        system.deliver(name="first123", to=recipient, account=self.alice, environment=env)
+        self.nameservice.set_contract_allowlist(contracts=["con_helper"], signer=self.manager)
+        prefixed.deliver(name="second123", to=recipient, account=self.alice, environment=env)
+        for name in ("first123", "second123"):
+            self.assertEqual(self.nameservice.get_owner(name=name, environment=env), recipient)
+
     def test_mixed_case_hex_manager_cannot_lock_registry_authority(self):
         with self.assertRaisesRegex(AssertionError, "canonical lowercase"):
             self.nameservice.set_manager(new_manager="B" * 64, signer=self.manager)
