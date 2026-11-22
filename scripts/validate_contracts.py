@@ -91,6 +91,9 @@ def validate_manifest(package: Path, contract_files: list[Path]) -> None:
         source_path = Path(source_path_value)
         if source_path.is_absolute() or ".." in source_path.parts:
             fail(f"{field_prefix}.path must stay inside the package")
+        source_path_key = source_path.as_posix()
+        if source_path_key in manifest_paths:
+            fail(f"{field_prefix}.path duplicates {source_path_key!r}")
         resolved_source_path = (package / source_path).resolve()
         try:
             resolved_source_path.relative_to(package_root)
@@ -98,7 +101,7 @@ def validate_manifest(package: Path, contract_files: list[Path]) -> None:
             fail(f"{field_prefix}.path must stay inside the package")
         if not resolved_source_path.exists():
             fail(f"{field_prefix}.path does not exist: {source_path_value}")
-        manifest_paths.add(source_path.as_posix())
+        manifest_paths.add(source_path_key)
 
         expected_hash = contract.get("sha256")
         if not isinstance(expected_hash, str) or len(expected_hash) != 64:
