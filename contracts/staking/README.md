@@ -53,13 +53,16 @@ positions or migrated `0.2.0` positions.
   separate per-token liabilities. `get_token_liability(...)` exposes their
   totals for custody monitoring.
 - Principal, rewards, and entry-fee funding must increase custody by exactly
-  the requested amount before any liability is credited. Funding tokens must
-  export `balance_of(address)`; fee-on-transfer and no-op incoming transfers
-  are rejected atomically.
+  the requested amount before any liability is credited. Before accepting
+  funding, staking checks the token's `transfer_from`, `transfer`, and
+  `balance_of(address)` signatures. Short and no-op transfers revert atomically.
 - Emergency recovery is excess-only: while paused, the contract owner may call
   `emergency_withdraw_token(...)` only up to
   `get_recoverable_excess(...)`. Active principal, unpaid reward deposits, and
   accrued creator funds remain protected.
+- `transfer_ownership` nominates a successor for the emergency controls. The
+  current owner retains those controls until the nominee calls
+  `accept_ownership` and can cancel the pending transfer.
 - This package has local automated tests and is one of the stronger maintained
   assets in the hub.
 

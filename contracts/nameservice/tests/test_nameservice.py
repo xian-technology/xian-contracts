@@ -80,6 +80,16 @@ class TestNameservice(unittest.TestCase):
         self.lease_height += 2
         return result
 
+    def test_invalid_prices_do_not_disable_minting(self):
+        for price in (0, -1, 10**61):
+            with self.subTest(price=price):
+                with self.assertRaisesRegex(AssertionError, "price must be positive"):
+                    self.nameservice.set_mint_price(price=price, signer=self.manager)
+
+        starting_balance = self.currency.balance_of(address=self.alice)
+        self.mint_and_checkpoint(name="alice123", signer=self.alice)
+        self.assertEqual(self.currency.balance_of(address=self.alice), starting_balance - 1)
+
     def test_mixed_case_hex_transfer_cannot_lock_name_ownership(self):
         env = {"now": Datetime(2026, 1, 1)}
         self.mint_and_checkpoint(name="alice123", signer=self.alice, environment=env)

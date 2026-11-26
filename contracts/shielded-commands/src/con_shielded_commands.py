@@ -576,6 +576,7 @@ def assert_escrow_invariant(token):
 
 
 operator = Variable()
+pending_operator = Variable()
 fee_token_contract = Variable()
 escrow_balance = Variable()
 root_history_window = Variable()
@@ -1003,8 +1004,30 @@ def change_operator(new_operator: str):
     assert isinstance(new_operator, str) and new_operator != "", (
         "New operator must be a non-empty string!"
     )
+    assert new_operator != operator.get(), "New operator must differ from the current operator."
+    pending_operator.set(new_operator)
+    return new_operator
+
+
+@export
+def get_pending_operator():
+    return pending_operator.get()
+
+
+@export
+def cancel_operator_transfer():
+    require_operator()
+    pending_operator.set(None)
+
+
+@export
+def accept_operator():
+    new_operator = pending_operator.get()
+    assert new_operator is not None, "No pending operator transfer."
+    assert ctx.caller == new_operator, "Only the pending operator can accept."
     previous = operator.get()
     operator.set(new_operator)
+    pending_operator.set(None)
     OperatorChanged(
         {
             "previous_operator": previous,

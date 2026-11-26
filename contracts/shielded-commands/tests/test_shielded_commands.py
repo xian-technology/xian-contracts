@@ -638,6 +638,22 @@ class TestShieldedCommands(unittest.TestCase):
         with self.assertRaises(AssertionError):
             self.commands.sweep_excess(to=treasury, signer="sys")
 
+    def test_operator_nominee_has_no_custody_authority_before_acceptance(self):
+        self.commands.change_operator(new_operator=self.alice, signer="sys")
+        self.assertEqual(self.commands.get_operator(), "sys")
+        with self.assertRaisesRegex(AssertionError, "pending operator"):
+            self.commands.accept_operator(signer=self.bob)
+        self.commands.cancel_operator_transfer(signer="sys")
+        self.assertIsNone(self.commands.get_pending_operator())
+        with self.assertRaisesRegex(AssertionError, "No pending operator"):
+            self.commands.accept_operator(signer=self.alice)
+        self.commands.change_operator(new_operator=self.alice, signer="sys")
+        self.commands.accept_operator(signer=self.alice)
+        self.assertEqual(self.commands.get_operator(), self.alice)
+        with self.assertRaises(AssertionError):
+            self.commands.set_relayer(account=self.bob, enabled=True, signer="sys")
+        self.commands.set_relayer(account=self.bob, enabled=True, signer=self.alice)
+
     def test_command_binding_rejects_wrong_relayer_and_replay(self):
         deposit_note = ShieldedNote(
             owner_secret=self.alice_keys.owner_secret,

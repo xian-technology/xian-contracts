@@ -161,6 +161,57 @@ class TestShieldedSchedulerAdapter(unittest.TestCase):
         self.assertEqual(self.target.info()["counter"], 3)
         self.assertEqual(self.target.info()["label"], "anon")
 
+    def test_scheduler_rotation_keeps_existing_actions_on_their_original_scheduler(self):
+        action = {
+            "action": "schedule",
+            "owner_commitment": scheduler_owner_commitment(self.owner_secret),
+            "target_contract": "con_adapter_target",
+            "run_at": Datetime(2026, 1, 1, 12, 5, 0),
+            "target_payload": {"increment": 3},
+        }
+        original = self.adapter.interact(
+            payload=action, signer="controller", environment=self._environment(self.start)
+        )
+        legacy = self.adapter.interact(
+            payload=action, signer="controller", environment=self._environment(self.start)
+        )
+        self.client.set_var(
+            "con_shielded_scheduler_adapter",
+            "adapter_actions",
+            [legacy["adapter_action_id"], "scheduler_contract"],
+            value=None,
+        )
+        self.client.raw_driver.commit()
+        self.client.submit(SCHEDULER_PATH.read_text(), name="con_next_scheduler")
+        replacement = self.client.get_contract_proxy("con_next_scheduler")
+        replacement.set_target_allowed(
+            target_contract="con_adapter_target", enabled=True, signer="sys"
+        )
+        self.adapter.set_scheduler_contract(scheduler_contract="con_next_scheduler", signer="sys")
+
+        newer = self.adapter.interact(
+            payload={**action, "target_payload": {"increment": 7}},
+            signer="controller",
+            environment=self._environment(self.start),
+        )
+        self.assertEqual(original["scheduler_action_id"], newer["scheduler_action_id"])
+        self.adapter.interact(
+            payload={"action": "execute", "adapter_action_id": original["adapter_action_id"]},
+            signer="controller",
+            environment=self._environment(Datetime(2026, 1, 1, 12, 6, 0)),
+        )
+        self.assertEqual(self.target.info()["counter"], 3)
+        self.assertEqual(self.scheduler.get_action(action_id=0)["status"], "executed")
+        self.assertEqual(replacement.get_action(action_id=0)["status"], "scheduled")
+        resolved = self.adapter.get_action(adapter_action_id=legacy["adapter_action_id"])
+        self.assertEqual(resolved["scheduler_contract"], "con_scheduled_actions")
+        self.adapter.interact(
+            payload={"action": "execute", "adapter_action_id": legacy["adapter_action_id"]},
+            signer="controller",
+            environment=self._environment(Datetime(2026, 1, 1, 12, 6, 0)),
+        )
+        self.assertEqual(self.target.info()["counter"], 6)
+
     def test_cancel_requires_valid_owner_proof_and_consumes_nullifier(self):
         self.adapter.interact(
             payload={

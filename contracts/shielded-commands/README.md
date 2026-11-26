@@ -13,6 +13,10 @@ Proof-backed shielded command pool for anonymous relayed contract execution.
 
 ## Notes
 
+- `change_operator` nominates a successor. The nominee calls `accept_operator`
+  to take over operator controls. The current operator can cancel with
+  `cancel_operator_transfer` before acceptance.
+
 - Public tokens are escrowed in the contract and represented as shielded notes.
 - `deposit_shielded` and `withdraw_shielded` use Groth16 proofs plus accepted
   roots, spent nullifiers, and note commitments.

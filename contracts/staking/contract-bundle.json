@@ -3,7 +3,7 @@
   "schema_version": 1,
   "name": "staking",
   "display_name": "Staking",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Successor-checkpoint annualized staking; requires canonical time_checkpoints v1 and its node keeper.",
   "source": {
     "repo": "https://github.com/xian-technology/xian-contracts"
@@ -13,7 +13,7 @@
       "name": "con_staking",
       "role": "staking",
       "path": "src/con_staking.py",
-      "sha256": "9bf9691db309d0858b997ddbef8e99f0341becc0008cb252a97580b6ca99165e",
+      "sha256": "3160f896361488f2f379c6b1887a9ad2881404ebb9c4cdda3148f2c953e662ab",
       "deploy_order": 10,
       "metadata": {
         "platform_dependencies": [

@@ -3,7 +3,7 @@
   "schema_version": 1,
   "name": "shielded-scheduler-adapter",
   "display_name": "Shielded Scheduler Adapter",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Proof-bound adapter for driving scheduled-actions through shielded commands.",
   "source": {
     "repo": "https://github.com/xian-technology/xian-contracts"
@@ -13,7 +13,7 @@
       "name": "con_shielded_scheduler_adapter",
       "role": "adapter",
       "path": "src/con_shielded_scheduler_adapter.py",
-      "sha256": "3b898c779262e14098e22abbd36e2f277da8e9a5e6511a507d5b4deda4deff88",
+      "sha256": "0e2c85a15ea92018e44931269aed27c471e56c1cf349c2abaf932091ff4c8bb9",
       "deploy_order": 10
     }
   ]

@@ -1,7 +1,7 @@
 # Weighted Lottery
 
-Ticket-weighted lottery example with configurable token pricing and creator-run
-draws.
+Ticket-weighted lottery with configurable token pricing and permissionless
+settlement.
 
 ## Status
 
@@ -15,11 +15,16 @@ draws.
 ## Notes
 
 - Entry weight is explicit and purchased with the configured token.
-- Draws use a deterministic entropy accumulator that incorporates buyer
-  contributions and exposes audit fields, but this is not suitable for
-  adversarial high-value use without stronger randomness design.
-- Cancelled rounds can move into a refunding state so ticket holders can claim
-  their stake back instead of relying on an all-or-nothing pre-sale cancel.
+- Deploy [Lottery Entropy](../lottery-entropy/) first. `create_lottery`
+  requires `beacon`, `creator_commitment`, `close_height`, and `reveal_deadline`.
+  `get_entries`, `get_entry_count`, and `get_lottery` expose the ordered
+  entrants, their weights, and the resulting draw.
+- A round accepts up to 64 distinct buyers. Buyers can add tickets until close.
+  Once both seeds are revealed, anyone can call `draw_winner`.
+- The creator or operator can cancel before close. Anyone can start refunds
+  after the reveal deadline if a seed is missing, or cancel an empty round
+  after close. Buyers each claim their own refund. Stored legacy rounds
+  without commitments can enter the same refund path.
 - Each lottery round is creator-scoped and parameterized by token contract and
   fixed-point decimal ticket price. The pot and refunds multiply this price by the integer ticket count.
 - The token must expose `transfer_from`, `transfer`, and `balance_of(address)`.

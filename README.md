@@ -77,7 +77,8 @@ test storage before collection; tests do not use the host node's state directory
 | `contracts/shielded-note-token`      | candidate    | Root / nullifier / note-based shielded token with registry-backed zk verification ids                |
 | `contracts/xsc005`                   | candidate    | XSC-0005 NFT standard checker and reference collection (the NFT product surface lives in `xian-nft`) |
 | `contracts/reflection-token`         | candidate    | Reflection token designed to integrate with the Xian DEX                                             |
-| `contracts/lottery`                  | experimental | Simple lottery pattern using deterministic public randomness                                         |
+| `contracts/lottery`                  | experimental | Creator-funded lottery with two-party commit and reveal                                              |
+| `contracts/lottery-entropy`          | experimental | Shared two-party entropy commitments and draw verification                                          |
 | `contracts/shielded-commands`        | experimental | Proof-backed shielded command pool for anonymous relayed contract execution                          |
 | `contracts/turn-based-games`         | experimental | Generic match registry for turn-based games with off-chain move / state refs                         |
 | `contracts/weighted-lottery`         | experimental | Ticket-weighted lottery example with configurable token pricing                                      |

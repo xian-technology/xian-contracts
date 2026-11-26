@@ -1,5 +1,6 @@
 """Keep default contract clients inside disposable storage during tests."""
 
+import hashlib
 import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -42,3 +43,55 @@ def checkpoint_time(client, *, height, now):
 def catalog_source(package, filename):
     root = Path(os.environ.get("XIAN_CATALOG_SOURCE_ROOT", Path(__file__).resolve().parent))
     return root / "contracts" / package / "src" / filename
+
+
+def deploy_lottery_entropy(client):
+    name = "con_lottery_entropy"
+    client.submit(catalog_source("lottery-entropy", f"{name}.py").read_text(), name=name)
+    return client.get_contract_proxy(name)
+
+
+def lottery_height(height):
+    return {"chain_id": "lottery-test", "block_num": height}
+
+
+def lottery_secret(round_id, role):
+    return f"{2 * round_id + (1 if role == 'creator' else 2):064x}"
+
+
+def lottery_commitment(lottery, round_id, role):
+    seed = lottery_secret(round_id, role)
+    return hashlib.sha3_256(
+        f"xian-lottery-commit-v1:lottery-test:{lottery}:{seed}".encode()
+    ).hexdigest()
+
+
+def lottery_terms(lottery, round_id):
+    return {
+        "creator_commitment": lottery_commitment(lottery, round_id, "creator"),
+        "beacon": "beacon",
+        "close_height": 10,
+        "reveal_deadline": 15,
+        "environment": lottery_height(2),
+    }
+
+
+def commit_lottery_beacon(entropy, lottery, round_id):
+    entropy.commit_beacon(
+        lottery=lottery,
+        round_id=round_id,
+        commitment=lottery_commitment(lottery, round_id, "beacon"),
+        signer="beacon",
+        environment=lottery_height(3),
+    )
+
+
+def reveal_lottery_seeds(entropy, lottery, round_id):
+    for role in ("creator", "beacon"):
+        entropy.reveal(
+            lottery=lottery,
+            round_id=round_id,
+            role=role,
+            seed=lottery_secret(round_id, role),
+            environment=lottery_height(10),
+        )

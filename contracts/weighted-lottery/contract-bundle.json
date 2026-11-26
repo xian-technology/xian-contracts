@@ -3,7 +3,7 @@
   "schema_version": 1,
   "name": "weighted-lottery",
   "display_name": "Weighted Lottery",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Ticket-weighted lottery example with configurable token pricing.",
   "source": {
     "repo": "https://github.com/xian-technology/xian-contracts"
@@ -13,8 +13,16 @@
       "name": "con_weighted_lottery",
       "role": "lottery",
       "path": "src/con_weighted_lottery.py",
-      "sha256": "83f50da59b08668832841a0a306911039cfa98903086f11016345f4e2a7f7b22",
-      "deploy_order": 10
+      "sha256": "1131a138284c4068dc7271ea257c9371c4fe747564fa832866e5bba9b36dba34",
+      "deploy_order": 10,
+      "metadata": {
+        "platform_dependencies": [
+          {
+            "contract": "con_lottery_entropy",
+            "source_sha3_256": "6dfb5dd490f91f932f81a1221c26dd3b3ad1589527eea9771286d842ba792061"
+          }
+        ]
+      }
     }
   ]
 }

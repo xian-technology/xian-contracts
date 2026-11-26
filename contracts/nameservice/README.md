@@ -44,7 +44,8 @@ is for fresh deployments, not an in-place conversion of `0.2.0` lease state.
   calendar (years 1–9999); these checks do not expand that calendar or turn an
   overflow into an available or silently nonexpiring name.
 - The manager controls pricing, registration period, contract allowlist, and
-  whether the registry is enabled.
+  whether the registry is enabled. Mint and renewal pricing uses a positive
+  whole-token amount within the VM's decimal range.
 - Transfer recipients, approval destinations, and replacement managers must
   be nonempty. Hex public keys must use canonical lowercase spelling, and
   named contract accounts retain their exact spelling.

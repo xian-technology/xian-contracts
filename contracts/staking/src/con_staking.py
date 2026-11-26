@@ -6,6 +6,11 @@ MIN_LOCK_DURATION = 3600
 MAX_LOCK_DURATION = 31536000
 MAX_APY = 100.0
 REWARD_MODEL = "annualized_v1"
+TOKEN_INTERFACE = [
+    importlib.Func("transfer", args=("amount", "to")),
+    importlib.Func("transfer_from", args=("amount", "to", "main_account")),
+    importlib.Func("balance_of", args=("address",)),
+]
 
 # State Variables
 pools = Hash()
@@ -13,6 +18,7 @@ stakes = Hash()
 pool_counter = Variable()
 paused = Variable()
 contract_owner = Variable()
+pending_owner = Variable()
 pool_stats = Hash()
 principal_liabilities = Hash(default_value=0.0)
 reward_liabilities = Hash(default_value=0.0)
@@ -90,8 +96,10 @@ def annualized_reward(stake_amount, apy, lock_duration):
 
 
 def receive_tokens(token_contract: str, amount: decimal):
+    assert importlib.enforce_interface(token_contract, TOKEN_INTERFACE), (
+        "Funding token must export balance_of and satisfy the payout interface."
+    )
     token = importlib.import_module(token_contract)
-    assert importlib.has_export(token_contract, "balance_of"), "Funding token must export balance_of."
     balance_before = token.balance_of(address=ctx.this)
     token.transfer_from(amount=amount, to=ctx.this, main_account=ctx.caller)
     assert token.balance_of(address=ctx.this) == balance_before + amount, "Staking requires an exact token transfer."
@@ -506,6 +514,31 @@ def calculate_rewards(pool_id: str, staker: str):
 
 # Emergency functions (contract owner only)
 @export
+def transfer_ownership(new_owner: str):
+    assert ctx.caller == contract_owner.get(), "Only contract owner can nominate a successor."
+    assert isinstance(new_owner, str) and new_owner != "", "New owner must be non-empty."
+    assert new_owner != ctx.caller, "New owner must differ from the current owner."
+    pending_owner.set(new_owner)
+    return new_owner
+
+
+@export
+def cancel_ownership_transfer():
+    assert ctx.caller == contract_owner.get(), "Only contract owner can cancel the handoff."
+    pending_owner.set(None)
+
+
+@export
+def accept_ownership():
+    nominee = pending_owner.get()
+    assert nominee is not None, "No pending ownership transfer."
+    assert ctx.caller == nominee, "Only the pending owner can accept."
+    contract_owner.set(nominee)
+    pending_owner.set(None)
+    return nominee
+
+
+@export
 def emergency_pause():
     assert ctx.caller == contract_owner.get(), "Only contract owner can pause"
     paused.set(True)
@@ -554,6 +587,7 @@ def get_contract_status():
     return {
         "paused": paused.get(),
         "owner": contract_owner.get(),
+        "pending_owner": pending_owner.get(),
         "total_pools": pool_counter.get(),
         "reward_model": REWARD_MODEL,
         "min_lock_duration": MIN_LOCK_DURATION,

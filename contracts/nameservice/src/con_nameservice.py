@@ -290,6 +290,7 @@ def renew_name(name: str):
 @export
 def set_mint_price(price: int):
     assert_is_manager()
+    assert 0 < price < 10**61, "Mint price must be positive and within the decimal range."
     mint_price.set(price)
 
 

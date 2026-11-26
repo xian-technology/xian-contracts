@@ -184,15 +184,9 @@ def require_authorization_vk():
     return vk_id
 
 
-def scheduler_contract_name():
-    name = metadata["scheduler_contract"]
+def scheduler_module(name: str):
     assert isinstance(name, str) and name != "", "scheduler_contract is not configured."
     assert importlib.exists(name), "Scheduler contract does not exist."
-    return name
-
-
-def scheduler_module():
-    name = scheduler_contract_name()
     for export_name in (
         "schedule_action",
         "reschedule_action",
@@ -205,6 +199,14 @@ def scheduler_module():
             "Scheduler contract is missing export " + export_name + "."
         )
     return importlib.import_module(name)
+
+
+def action_scheduler_contract(adapter_action_id: int):
+    return (
+        adapter_actions[adapter_action_id, "scheduler_contract"]
+        or metadata["legacy_scheduler_contract"]
+        or metadata["scheduler_contract"]
+    )
 
 
 def require_adapter_action(adapter_action_id: int):
@@ -278,14 +280,10 @@ def require_update_authorization(
     }
 
 
-def store_scheduler_snapshot(adapter_action_id: int):
-    scheduler_action_id = require_adapter_action(adapter_action_id)
-    scheduler = scheduler_module()
-    action = scheduler.get_action(action_id=scheduler_action_id)
+def store_scheduler_snapshot(adapter_action_id: int, action: dict):
     adapter_actions[adapter_action_id, "status"] = action["status"]
     adapter_actions[adapter_action_id, "scheduler_updated_at"] = action["updated_at"]
     adapter_actions[adapter_action_id, "updated_at"] = now
-    return action
 
 
 @export
@@ -307,13 +305,16 @@ def set_controller_contract(controller_contract: str = ""):
 @export
 def set_scheduler_contract(scheduler_contract: str):
     require_operator()
-    metadata["scheduler_contract"] = normalize_text(
+    scheduler_contract = normalize_text(
         scheduler_contract,
         "scheduler_contract",
         128,
     )
-    scheduler_contract_name()
-    return metadata["scheduler_contract"]
+    scheduler_module(scheduler_contract)
+    if metadata["legacy_scheduler_contract"] is None:
+        metadata["legacy_scheduler_contract"] = metadata["scheduler_contract"]
+    metadata["scheduler_contract"] = scheduler_contract
+    return scheduler_contract
 
 
 @export
@@ -339,6 +340,7 @@ def get_action(adapter_action_id: int):
     return {
         "adapter_action_id": adapter_action_id,
         "scheduler_action_id": scheduler_action_id,
+        "scheduler_contract": action_scheduler_contract(adapter_action_id),
         "owner_commitment": adapter_actions[adapter_action_id, "owner_commitment"],
         "target_contract": adapter_actions[adapter_action_id, "target_contract"],
         "status": adapter_actions[adapter_action_id, "status"],
@@ -387,9 +389,10 @@ def interact(payload: dict):
     require_controller()
     payload = normalize_payload(payload)
     action = normalize_text(payload.get("action"), "action", 32)
-    scheduler = scheduler_module()
 
     if action == "schedule":
+        scheduler_contract = metadata["scheduler_contract"]
+        scheduler = scheduler_module(scheduler_contract)
         target_contract = normalize_text(
             payload.get("target_contract"), "target_contract", 128
         )
@@ -411,11 +414,12 @@ def interact(payload: dict):
         adapter_action_id = next_adapter_action_id.get()
         next_adapter_action_id.set(adapter_action_id + 1)
         adapter_actions[adapter_action_id, "scheduler_action_id"] = scheduler_action_id
+        adapter_actions[adapter_action_id, "scheduler_contract"] = scheduler_contract
         adapter_actions[adapter_action_id, "owner_commitment"] = owner_commitment
         adapter_actions[adapter_action_id, "target_contract"] = target_contract
         adapter_actions[adapter_action_id, "created_at"] = now
-        adapter_actions[adapter_action_id, "updated_at"] = now
-        scheduler_action = store_scheduler_snapshot(adapter_action_id)
+        scheduler_action = scheduler.get_action(action_id=scheduler_action_id)
+        store_scheduler_snapshot(adapter_action_id, scheduler_action)
         AdapterActionCreatedEvent(
             {
                 "adapter_action_id": adapter_action_id,
@@ -432,6 +436,7 @@ def interact(payload: dict):
 
     adapter_action_id = payload.get("adapter_action_id")
     scheduler_action_id = require_adapter_action(adapter_action_id)
+    scheduler = scheduler_module(action_scheduler_contract(adapter_action_id))
 
     if action == "reschedule":
         parameters = reschedule_authorization_parameters(payload)
@@ -459,7 +464,7 @@ def interact(payload: dict):
     else:
         assert False, "Unsupported adapter action."
 
-    store_scheduler_snapshot(adapter_action_id)
+    store_scheduler_snapshot(adapter_action_id, scheduler_action)
     AdapterActionUpdatedEvent(
         {
             "adapter_action_id": adapter_action_id,

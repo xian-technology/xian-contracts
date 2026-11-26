@@ -1,0 +1,20 @@
+{
+  "schema": "xian.contract_bundle.v1",
+  "schema_version": 1,
+  "name": "lottery-entropy",
+  "display_name": "Lottery Entropy",
+  "version": "0.1.0",
+  "description": "Two-party commit-and-reveal service for lotteries.",
+  "source": {
+    "repo": "https://github.com/xian-technology/xian-contracts"
+  },
+  "contracts": [
+    {
+      "name": "con_lottery_entropy",
+      "role": "entropy",
+      "path": "src/con_lottery_entropy.py",
+      "sha256": "3aaa5b88747fa6fc0467f23806e97cc73a1fd136e484d31bd990cd8952a5791f",
+      "deploy_order": 10
+    }
+  ]
+}

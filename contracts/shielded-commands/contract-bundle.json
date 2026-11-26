@@ -3,7 +3,7 @@
   "schema_version": 1,
   "name": "shielded-commands",
   "display_name": "Shielded Commands",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Proof-backed shielded command pool for anonymous relayed contract execution.",
   "source": {
     "repo": "https://github.com/xian-technology/xian-contracts"
@@ -13,7 +13,7 @@
       "name": "con_shielded_commands",
       "role": "controller",
       "path": "src/con_shielded_commands.py",
-      "sha256": "ba6887a0da8921a8495d461b04dd4215508cbb5de4bcf4b275ad8dac65943e77",
+      "sha256": "2640b0dee6b6654ddd3ed38ec3255644a957a4cbbd073c929cf54904176220e4",
       "deploy_order": 10
     }
   ]

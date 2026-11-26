@@ -32,6 +32,7 @@ flowchart LR
 ## Packages
 
 - `lottery/`: simple lottery example
+- `lottery-entropy/`: two-party commitment and reveal for lottery draws
 - `nameservice/`: renewable name registry
 - `profile-registry/`: social profile and channel registry scaffold
 - `scheduled-actions/`: allowlisted delayed-call scheduler

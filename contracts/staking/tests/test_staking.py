@@ -1220,6 +1220,19 @@ def approve(amount: decimal, to: str):
             self.staking.emergency_pause(signer=self.creator)
         self.assertIn("Only contract owner can pause", str(context.exception))
 
+    def test_owner_handoff_requires_acceptance_and_can_be_cancelled(self):
+        self.staking.transfer_ownership(new_owner=self.creator, signer=self.owner)
+        with self.assertRaisesRegex(AssertionError, "Only contract owner"):
+            self.staking.emergency_pause(signer=self.creator)
+        self.staking.cancel_ownership_transfer(signer=self.owner)
+        with self.assertRaisesRegex(AssertionError, "No pending"):
+            self.staking.accept_ownership(signer=self.creator)
+        self.staking.transfer_ownership(new_owner=self.creator, signer=self.owner)
+        self.staking.accept_ownership(signer=self.creator)
+        with self.assertRaisesRegex(AssertionError, "Only contract owner"):
+            self.staking.emergency_pause(signer=self.owner)
+        self.staking.emergency_pause(signer=self.creator)
+
     def test_emergency_withdraw_token(self):
         """Test emergency token withdrawal"""
         # Transfer some tokens to contract first

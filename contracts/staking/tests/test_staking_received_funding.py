@@ -35,12 +35,14 @@ def transfer_from(amount: decimal, to: str, main_account: str):
 """
 
 
-def setup_pool(tmp_path, purpose, received_bps, *, payout_bps=10000, debit_bps=10000, apy=0):
+def setup_pool(
+    tmp_path, purpose, received_bps, *, payout_bps=10000, debit_bps=10000, apy=0, source=TOKEN
+):
     client = ContractingClient(storage_home=tmp_path)
     deploy_time_checkpoints(client)
     client.submit(TOKEN, name="con_plain")
     client.submit(
-        TOKEN,
+        source,
         name="con_taxed",
         constructor_args={
             "received_bps_value": received_bps,
@@ -75,6 +77,21 @@ def fund(staking, pool, purpose):
         )
     else:
         staking.stake(pool_id=pool, signer="alice", environment={"block_num": 100})
+
+
+@pytest.mark.parametrize("purpose", ["principal", "rewards", "entry_fee"])
+def test_staking_checks_payout_interface_before_taking_custody(tmp_path, purpose):
+    source = TOKEN.replace(
+        "def transfer(amount: decimal, to: str):", "def send(amount: decimal, to: str):"
+    )
+    client, staking, pool = setup_pool(tmp_path, purpose, 10000, source=source)
+    with client:
+        with pytest.raises(AssertionError, match="payout interface"):
+            fund(staking, pool, purpose)
+        token = client.get_contract_proxy("con_taxed")
+        assert token.balance_of(address="alice") == 1000
+        assert token.balance_of(address="con_staking") == 0
+        assert staking.get_token_liability(token_contract="con_taxed")["total"] == 0
 
 
 @pytest.mark.parametrize("purpose", ["principal", "rewards", "entry_fee"])

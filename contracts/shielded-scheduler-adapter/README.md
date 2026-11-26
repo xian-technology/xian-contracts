@@ -31,6 +31,9 @@ Proof-bound adapter for driving `scheduled-actions` through
 - Reusing a previously observed schedule payload or replaying an already used
   authorization nullifier cannot authorize another update.
 - The backing scheduler enforces its own allowlists and timing rules.
+- Each adapter action stays with the scheduler that created it. Changing the
+  default scheduler applies to future actions. `get_action` exposes the backing
+  scheduler alongside its action ID.
 
 ## Validation
 
